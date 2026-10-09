@@ -63,7 +63,7 @@ The project uses large-scale hotels such as **The Kingsbury, Sri Lanka**, as a r
 | Component        | Technology                  |
 | ---------------- | --------------------------- |
 | Frontend         | HTML, CSS, JavaScript       |
-| Backend          | Python, FastAPI             |
+| Backend          | Python, Flask             |
 | Machine Learning | Python, Scikit-learn        |
 | Trained Model    | Pickle (.pkl)               |
 | Development      | VS Code, AI-assisted coding |
@@ -81,7 +81,7 @@ The current application follows this general architecture:
    (HTML, CSS, JavaScript)
             |
             v
-      FastAPI Backend
+      Flask Backend
             |
             v
     Machine Learning Model
@@ -129,7 +129,7 @@ To run the project locally:
 - [x] Identify the food waste management problem.
 - [x] Design the initial web application.
 - [x] Train a machine learning forecasting model.
-- [x] Connect the machine learning model to FastAPI.
+- [x] Connect the machine learning model to Flask.
 - [ ] Implement historical consumption charts.
 - [ ] Add interactive chart functionality.
 - [ ] Integrate automatic food recognition.
