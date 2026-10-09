@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#183c37">
+    <title>{% block title %}{% endblock %} · Food Waste Tracking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Application navigation">
+        <a class="brand" href="{{ url_for('dashboard') }}" aria-label="Food Waste Tracking dashboard">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span><strong>Food Waste</strong><small>Tracking System</small></span>
+        </a>
+        <div class="workspace-label">WORKSPACE</div>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="{{ url_for('dashboard') }}" {% if active_page == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
+          <a href="{{ url_for('records') }}" {% if active_page == 'records' %}aria-current="page"{% endif %}>Waste records</a>
+          <a href="{{ url_for('new_record') }}" {% if active_page == 'new_record' %}aria-current="page"{% endif %}>Add waste record</a>
+          <a href="{{ url_for('forecast') }}" {% if active_page == 'forecast' %}aria-current="page"{% endif %}>Meal forecast</a>
+        </nav>
+        <div class="sidebar-note">
+          <span class="note-dot" aria-hidden="true"></span>
+          <span>Academic prototype<br><small>Local demo</small></span>
+        </div>
+      </aside>
+
+      <div class="content-shell">
+        <header class="topbar">
+          <div class="topbar-context">OPERATIONS / FOOD WASTE</div>
+          <span class="demo-pill">Local demo</span>
+        </header>
+        <main id="main-content" class="page-content">
+          {% block content %}{% endblock %}
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
