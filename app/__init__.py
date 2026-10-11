@@ -9,6 +9,7 @@ from app import entry
 from app import edit_record as record_edit
 from app import record_list
 from app import forecast
+from app import food_classifier
 
 
 def create_app(test_config=None):
@@ -38,5 +39,8 @@ def create_app(test_config=None):
 
     app.add_url_rule("/api/forecast-history", endpoint="forecast_history",
                      view_func=forecast.forecast_history, methods=["GET"])
+
+    app.add_url_rule("/food-prediction", endpoint="food_prediction",
+                     view_func=food_classifier.food_prediction, methods=["GET", "POST"])
 
     return app

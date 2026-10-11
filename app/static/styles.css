@@ -196,3 +196,18 @@ th:last-child, td:last-child { padding-right: 0; }
 .reset-zoom-btn { font-size: 0.75rem; padding: 4px 8px; border-radius: 6px; background-color: #e5eee7; color: #24443b; border: none; cursor: pointer; transition: background-color 0.2s; }
 .reset-zoom-btn:hover { background-color: #d1e2d6; }
 .chart-hint { font-size: 0.75rem; color: #888; text-align: center; margin-top: 8px; font-style: italic; }
+.food-prediction-panel { margin-top: 20px; max-width: 900px; }
+.food-upload-box { padding: 22px; border: 2px dashed #bed8c5; border-radius: 12px; background: #f8fcf8; }
+.food-upload-box input[type="file"] { background: #fff; }
+.food-selected-file { margin: 13px 0 0; color: #315d49; font-size: .86rem; overflow-wrap: anywhere; }
+.food-selected-preview { display: block; width: auto; max-width: 100%; max-height: 260px; margin-top: 14px; }
+.food-selected-preview[hidden] { display: none; }
+.food-prediction-layout { display: grid; grid-template-columns: minmax(180px, 300px) 1fr; gap: 28px; align-items: start; }
+.food-preview { width: 100%; max-height: 330px; object-fit: contain; border-radius: 10px; background: #f0f4ef; }
+.food-result-label { margin-bottom: 4px; color: #657d6e; font-size: .82rem; font-weight: 700; }
+.food-result-name { margin-bottom: 4px; color: #174e3b; font-size: 1.8rem; font-weight: 800; }
+.food-result-confidence { color: #286c53; font-weight: 700; }
+.food-alternatives { list-style: none; margin: 10px 0 20px; padding: 0; }
+.food-alternatives li { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid #e7eee9; }
+.food-result-note { color: #657d6e; font-size: .82rem; }
+@media (max-width: 690px) { .food-prediction-layout { grid-template-columns: 1fr; } }
