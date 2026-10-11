@@ -119,10 +119,18 @@ To run the project locally:
 3. Set up a Python virtual environment.
 4. Install the required project dependencies.
 5. Make sure the trained machine learning model is available.
-6. Start the FastAPI backend.
-7. Open the frontend application.
+6. Start the Flask app with `python run.py`.
+7. Open <http://127.0.0.1:5000/>.
 
-*Exact installation commands will be added after the project setup is finalized.*
+On Windows PowerShell, create a virtual environment with `py -3.12 -m venv .venv`, install dependencies with `.venv\Scripts\python.exe -m pip install -r requirements.txt`, and run with `.venv\Scripts\python.exe run.py`. Initialize a new database with `.venv\Scripts\python.exe -m flask --app run init-db --seed`.
+
+## Temporary Food-101 image prediction
+
+Open <http://127.0.0.1:5000/food-prediction> and upload one food image (up to 8 MB). The page displays the three most likely Food-101 labels and their model confidence. The supplied `models/food101_mobilenetv2.keras` is loaded on the first prediction. The existing forecasting model and waste-record pages continue to use their existing routes.
+
+Inference uses RGB pixels, `tf.image.resize(image, (224, 224))`, and `tf.keras.applications.mobilenet_v2.preprocess_input`, matching the training code. `app/food101_labels.txt` contains the ordered class names from TensorFlow Datasets' Food-101 label file. This model classifies the whole image among 101 foods; it does not locate multiple items, read CCTV, or estimate kilograms. Uploaded images and predictions are not saved to the database.
+
+Run tests with `.venv\Scripts\python.exe -m pip install -r requirements-dev.txt` and `.venv\Scripts\python.exe -m pytest -q --basetemp .pytest-run`.
 
 ## 🗺️ Development Roadmap
 
