@@ -130,13 +130,13 @@ Open <http://127.0.0.1:5000/food-prediction> and upload one food image (up to 8 
 
 Inference uses RGB pixels, `tf.image.resize(image, (224, 224))`, and `tf.keras.applications.mobilenet_v2.preprocess_input`, matching the training code. `app/food101_labels.txt` contains the ordered class names from TensorFlow Datasets' Food-101 label file. This model classifies the whole image among 101 foods; it does not locate multiple items, read CCTV, or estimate kilograms. Uploaded images and predictions are not saved to the database.
 
-## Food object detection (YOLOS)
+## Food item counting (OWLv2)
 
-Open <http://127.0.0.1:5000/food-detection> and upload a photo of a plate, buffet tray or table. The page uses the pretrained [`hustvl/yolos-small`](https://huggingface.co/hustvl/yolos-small) model from Hugging Face Transformers (PyTorch) to draw a box around every object it finds, and lists each one as food, tableware or other with its confidence. You can choose a minimum confidence of 50%, 70% or 90%.
+Open <http://127.0.0.1:5000/food-detection> (**Food counting** in the sidebar), upload a photo, and type what to count, such as `cupcake`, `egg` or `bread roll`. The page uses the open-vocabulary detector [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) from Hugging Face Transformers (PyTorch). It finds objects from a text description, so it can count items without fine-tuning. Each match is boxed and numbered, overlapping boxes on the same item are counted once, and the total is shown at the top. You can choose a minimum confidence of 20%, 30% or 50%.
 
-The first detection downloads about 120 MB of model weights into the Hugging Face cache (`%USERPROFILE%\.cache\huggingface`), so it needs an internet connection and takes longer. Later requests reuse the loaded model. To run offline, save the model to a folder with `save_pretrained` and set `FOOD_DETECTOR_MODEL_NAME` in the app config to that folder.
+The first count downloads about 600 MB of model weights into the Hugging Face cache (`%USERPROFILE%\.cache\huggingface`), so it needs an internet connection and takes longer. Later counts take about 5 seconds on a CPU. To run offline, save the model to a folder with `save_pretrained` and set `FOOD_DETECTOR_MODEL_NAME` in the app config to that folder.
 
-YOLOS was trained on COCO, which has 80 object classes. Only ten are food (apple, banana, broccoli, cake, carrot, donut, hot dog, orange, pizza, sandwich), so it cannot name dishes such as curries or string hoppers, and it does not estimate kilograms. Like the Food-101 page, uploaded images and detections are not saved.
+Counting works for separate items photographed from above. It does not work for loose food such as rice, curry or salad, and stacked or cut-off items may be miscounted. For the hotel's own dishes, the long-term option is fine-tuning a detector on labelled hotel photos. Uploaded images and counts are not saved.
 
 Run tests with `.venv\Scripts\python.exe -m pip install -r requirements-dev.txt` and `.venv\Scripts\python.exe -m pytest -q --basetemp .pytest-run`.
 

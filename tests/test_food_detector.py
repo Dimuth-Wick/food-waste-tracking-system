@@ -7,15 +7,19 @@ from app import food_detector
 
 
 class FakeDetector:
-    def __init__(self):
-        self.thresholds = []
+    """Three cupcakes, plus a duplicate box and a part-of-item box to drop."""
 
-    def __call__(self, image, threshold):
-        self.thresholds.append(threshold)
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, image, item, threshold):
+        self.calls.append((item, threshold))
         return [
-            {"label": "cup", "score": 0.75, "box": [2, 2, 12, 12]},
-            {"label": "pizza", "score": 0.93, "box": [5, 4, 80, 50]},
-            {"label": "dining table", "score": 0.81, "box": [-10, 30, 200, 90]},
+            {"score": 0.72, "box": [5, 5, 40, 40]},
+            {"score": 0.65, "box": [6, 6, 41, 41]},      # same cupcake again
+            {"score": 0.74, "box": [50, 5, 90, 40]},
+            {"score": 0.31, "box": [60, 10, 75, 25]},    # inside the cupcake above
+            {"score": 0.70, "box": [-10, 45, 60, 120]},  # runs off the photo
         ]
 
 
@@ -33,70 +37,71 @@ def _client(tmp_path, detector=None):
     return create_app(config).test_client()
 
 
-def test_food_detection_page_and_image_upload(tmp_path):
+def _post(client, **fields):
+    data = {"image": (_image_bytes(), "cupcakes.png"), "item": "cupcake"}
+    data.update(fields)
+    return client.post("/food-detection", data=data, content_type="multipart/form-data")
+
+
+def test_food_counting_page_and_image_upload(tmp_path):
     detector = FakeDetector()
     client = _client(tmp_path, detector)
     page = client.get("/food-detection")
     assert page.status_code == 200
-    assert b"Food detection" in page.data
-    assert b"hustvl/yolos-small" in page.data
+    assert b"Food counting" in page.data
+    assert b'value="cupcake"' in page.data
 
-    result = client.post(
-        "/food-detection",
-        data={"image": (_image_bytes(), "table.png"), "threshold": "50"},
-        content_type="multipart/form-data",
-    )
+    result = _post(client, item="  Cupcake ", threshold="20")
     assert result.status_code == 200
-    assert detector.thresholds == [0.5]
+    assert detector.calls == [("cupcake", 0.2)]
     html = result.data.decode()
-    assert html.index("Pizza") < html.index("Dining Table") < html.index("Cup")
-    assert "93.0%" in html
-    assert "3 objects found at 50%+ confidence" in html
-    assert "1 of them food" in html
-    assert "detection-tag-tableware" in html
+    assert '<p class="detection-count">3</p>' in html
+    assert "Number of “cupcake” found" in html
+    assert html.index("74.0%") < html.index("72.0%") < html.index("70.0%")
+    assert "65.0%" not in html and "31.0%" not in html
     assert "data:image/jpeg;base64," in html
 
 
-def test_food_detection_clamps_boxes_and_groups_labels(tmp_path):
+def test_food_counting_merges_duplicates_and_clamps_boxes(tmp_path):
     app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "test.sqlite3"),
                       "FOOD_DETECTOR": FakeDetector()})
     with app.app_context():
-        detections = food_detector._detect(Image.new("RGB", (120, 80)), 70)
-    assert [item["label"] for item in detections] == ["Pizza", "Dining Table", "Cup"]
-    assert [item["group"] for item in detections] == ["food", "tableware", "tableware"]
-    assert detections[1]["box"] == (0.0, 30.0, 120.0, 80.0)
-    food_detector._draw_boxes(Image.new("RGB", (120, 80)), detections)
+        found = food_detector._count(Image.new("RGB", (120, 80)), "cupcake", 30)
+    assert [round(item["confidence"]) for item in found] == [74, 72, 70]
+    assert found[2]["box"] == (0.0, 45.0, 60.0, 80.0)
+    food_detector._draw_boxes(Image.new("RGB", (120, 80)), found)
 
 
-def test_food_detection_ignores_unknown_threshold(tmp_path):
+def test_food_counting_ignores_unknown_threshold(tmp_path):
+    detector = FakeDetector()
+    _post(_client(tmp_path, detector), threshold="3")
+    assert detector.calls == [("cupcake", food_detector.DEFAULT_THRESHOLD / 100)]
+
+
+def test_food_counting_rejects_bad_item_names(tmp_path):
     detector = FakeDetector()
     client = _client(tmp_path, detector)
-    client.post(
-        "/food-detection",
-        data={"image": (_image_bytes(), "table.png"), "threshold": "3"},
-        content_type="multipart/form-data",
-    )
-    assert detector.thresholds == [food_detector.DEFAULT_THRESHOLD / 100]
+    for item in ["", "   ", "<script>", "x" * 41]:
+        result = _post(client, item=item)
+        assert result.status_code == 400
+        assert b"Type the food item to count" in result.data
+    assert detector.calls == []
 
 
-def test_food_detection_rejects_missing_and_invalid_uploads(tmp_path):
+def test_food_counting_rejects_missing_and_invalid_uploads(tmp_path):
     client = _client(tmp_path, FakeDetector())
-    assert client.post("/food-detection", data={}).status_code == 400
+    assert client.post("/food-detection", data={"item": "cupcake"}).status_code == 400
     result = client.post(
         "/food-detection",
-        data={"image": (io.BytesIO(b"not an image"), "fake.jpg")},
+        data={"image": (io.BytesIO(b"not an image"), "fake.jpg"), "item": "cupcake"},
         content_type="multipart/form-data",
     )
     assert result.status_code == 400
     assert b"not a valid image" in result.data
 
 
-def test_food_detection_shows_empty_state(tmp_path):
-    client = _client(tmp_path, lambda image, threshold: [])
-    result = client.post(
-        "/food-detection",
-        data={"image": (_image_bytes(), "empty.png")},
-        content_type="multipart/form-data",
-    )
+def test_food_counting_shows_empty_state(tmp_path):
+    result = _post(_client(tmp_path, lambda image, item, threshold: []), item="egg")
     assert result.status_code == 200
-    assert b"No objects found at 70%+ confidence" in result.data
+    assert b'<p class="detection-count">0</p>' in result.data
+    assert "No “egg” found at 30%+ confidence".encode() in result.data

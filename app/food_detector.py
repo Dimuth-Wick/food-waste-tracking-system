@@ -1,10 +1,11 @@
-"""Object-detection demo using the pretrained hustvl/yolos-small COCO model.
+"""Count food items in a photo with the OWLv2 open-vocabulary detector.
 
-Unlike the Food-101 classifier, which names one dish for the whole photo,
-YOLOS finds every object it recognises and returns a bounding box for each.
-It was trained on COCO, so it only knows 80 everyday object classes; of those,
-only the ones in ``FOOD_LABELS`` are food.
+The user types what to count (for example "cupcake") and OWLv2 boxes every
+match. Unlike a COCO detector such as YOLOS, OWLv2 is not limited to a fixed
+list of classes, so it can count items it was never fine-tuned on.
 """
+
+import re
 
 from flask import current_app, render_template, request
 from PIL import ImageDraw, ImageFont
@@ -12,51 +13,41 @@ from PIL import ImageDraw, ImageFont
 from app.image_upload import UploadError, jpeg_preview, read_uploaded_image
 
 
-MODEL_NAME = "hustvl/yolos-small"
-THRESHOLDS = (50, 70, 90)
-DEFAULT_THRESHOLD = 70
+MODEL_NAME = "google/owlv2-base-patch16-ensemble"
+THRESHOLDS = (20, 30, 50)
+DEFAULT_THRESHOLD = 30
+DEFAULT_ITEM = "cupcake"
+MAX_ITEM_LENGTH = 40
+BOX_COLOUR = "#1f8a5b"
 
-FOOD_LABELS = frozenset({
-    "apple", "banana", "broccoli", "cake", "carrot", "donut", "hot dog",
-    "orange", "pizza", "sandwich",
-})
-TABLEWARE_LABELS = frozenset({
-    "bottle", "bowl", "cup", "dining table", "fork", "knife", "spoon",
-    "wine glass",
-})
-GROUP_COLOURS = {"food": "#1f8a5b", "tableware": "#d08a1f", "other": "#6b7c86"}
-
-
-def _group(label):
-    if label in FOOD_LABELS:
-        return "food"
-    if label in TABLEWARE_LABELS:
-        return "tableware"
-    return "other"
+# Boxes that overlap this much are treated as the same item.
+DUPLICATE_IOU = 0.5
+# A box this much inside a stronger box is a part of that item, not a new one.
+DUPLICATE_CONTAINED = 0.8
 
 
 def _load_detector():
-    """Build a ``detect(image, threshold)`` callable around the YOLOS model."""
+    """Build a ``detect(image, item, threshold)`` callable around OWLv2."""
     import torch
-    from transformers import AutoImageProcessor, AutoModelForObjectDetection
+    from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
 
     name = current_app.config.get("FOOD_DETECTOR_MODEL_NAME", MODEL_NAME)
-    processor = AutoImageProcessor.from_pretrained(name)
-    model = AutoModelForObjectDetection.from_pretrained(name).eval()
+    processor = AutoProcessor.from_pretrained(name)
+    model = AutoModelForZeroShotObjectDetection.from_pretrained(name).eval()
 
-    def detect(image, threshold):
-        inputs = processor(images=image, return_tensors="pt")
+    def detect(image, item, threshold):
+        inputs = processor(images=image, text=[[f"a photo of a {item}"]],
+                           return_tensors="pt")
         with torch.inference_mode():
             outputs = model(**inputs)
-        result = processor.post_process_object_detection(
-            outputs, threshold=threshold,
-            target_sizes=torch.tensor([image.size[::-1]]),
+        # OWLv2 pads the photo to a square, so boxes are scaled to that square.
+        side = max(image.size)
+        result = processor.post_process_grounded_object_detection(
+            outputs, threshold=threshold, target_sizes=torch.tensor([[side, side]]),
         )[0]
         return [
-            {"label": model.config.id2label[int(label)], "score": float(score),
-             "box": [float(value) for value in box]}
-            for score, label, box in zip(
-                result["scores"], result["labels"], result["boxes"])
+            {"score": float(score), "box": [float(value) for value in box]}
+            for score, box in zip(result["scores"], result["boxes"])
         ]
 
     return detect
@@ -74,42 +65,53 @@ def _get_detector():
     return detector
 
 
-def _detect(image, threshold):
+def _area(box):
+    return (box[2] - box[0]) * (box[3] - box[1])
+
+
+def _is_duplicate(box, kept):
+    left, top = max(box[0], kept[0]), max(box[1], kept[1])
+    right, bottom = min(box[2], kept[2]), min(box[3], kept[3])
+    overlap = max(0.0, right - left) * max(0.0, bottom - top)
+    if not overlap:
+        return False
+    union = _area(box) + _area(kept) - overlap
+    return (overlap / union >= DUPLICATE_IOU
+            or overlap / min(_area(box), _area(kept)) >= DUPLICATE_CONTAINED)
+
+
+def _count(image, item, threshold):
+    """Return one detection per item, strongest first, inside the photo."""
     width, height = image.size
-    detections = []
-    for item in _get_detector()(image, threshold / 100):
-        x0, y0, x1, y1 = item["box"]
+    candidates = []
+    for found in _get_detector()(image, item, threshold / 100):
+        x0, y0, x1, y1 = found["box"]
         box = (max(0.0, min(x0, x1)), max(0.0, min(y0, y1)),
                min(float(width), max(x0, x1)), min(float(height), max(y0, y1)))
-        if box[2] - box[0] < 1 or box[3] - box[1] < 1:
-            continue
-        detections.append({
-            "label": item["label"].title(),
-            "group": _group(item["label"]),
-            "confidence": item["score"] * 100,
-            "box": box,
-        })
-    detections.sort(key=lambda item: item["confidence"], reverse=True)
+        if box[2] - box[0] >= 1 and box[3] - box[1] >= 1:
+            candidates.append({"confidence": found["score"] * 100, "box": box})
+    candidates.sort(key=lambda found: found["confidence"], reverse=True)
+
+    detections = []
+    for found in candidates:
+        if not any(_is_duplicate(found["box"], kept["box"]) for kept in detections):
+            detections.append(found)
     return detections
 
 
 def _draw_boxes(image, detections):
-    """Return a copy of ``image`` with each detection outlined and labelled."""
+    """Return a copy of ``image`` with each counted item outlined and numbered."""
     image = image.copy()
     draw = ImageDraw.Draw(image)
     line = max(2, round(max(image.size) / 300))
-    font = ImageFont.load_default(size=max(12, round(max(image.size) / 45)))
-    for number, item in enumerate(detections, start=1):
-        colour = GROUP_COLOURS[item["group"]]
-        draw.rectangle(item["box"], outline=colour, width=line)
-        caption = f"{number}. {item['label']} {item['confidence']:.0f}%"
-        left, top = item["box"][0], item["box"][1]
-        text_box = draw.textbbox((left, top), caption, font=font)
-        text_height = text_box[3] - text_box[1] + line * 2
-        top = top - text_height if top >= text_height else top
-        text_box = draw.textbbox((left + line, top + line), caption, font=font)
-        draw.rectangle((left, top, text_box[2] + line, text_box[3] + line), fill=colour)
-        draw.text((left + line, top + line), caption, fill="#ffffff", font=font)
+    font = ImageFont.load_default(size=max(14, round(max(image.size) / 30)))
+    for number, found in enumerate(detections, start=1):
+        draw.rectangle(found["box"], outline=BOX_COLOUR, width=line)
+        left, top = found["box"][0], found["box"][1]
+        text_box = draw.textbbox((left + line, top + line), str(number), font=font)
+        draw.rectangle((left, top, text_box[2] + line * 2, text_box[3] + line * 2),
+                       fill=BOX_COLOUR)
+        draw.text((left + line, top + line), str(number), fill="#ffffff", font=font)
     return image
 
 
@@ -121,31 +123,47 @@ def _threshold_from_form():
     return value if value in THRESHOLDS else DEFAULT_THRESHOLD
 
 
+def _item_from_form():
+    """Return the cleaned item name, or None if it is empty or unusable."""
+    item = " ".join(request.form.get("item", "").split()).lower()
+    if not item or len(item) > MAX_ITEM_LENGTH or not re.fullmatch(r"[a-z0-9 '\-]+", item):
+        return None
+    return item
+
+
 def food_detection():
-    """Show the upload form and temporary, unsaved detections."""
+    """Show the upload form and a temporary, unsaved item count."""
     context = {"active_page": "food_detection", "detections": None,
-               "thresholds": THRESHOLDS, "threshold": DEFAULT_THRESHOLD}
+               "thresholds": THRESHOLDS, "threshold": DEFAULT_THRESHOLD,
+               "item": DEFAULT_ITEM, "max_item_length": MAX_ITEM_LENGTH}
     if request.method == "GET":
         return render_template("food_detection.html", **context)
 
     context["threshold"] = _threshold_from_form()
+    item = _item_from_form()
+    context["item"] = request.form.get("item", "").strip()[:MAX_ITEM_LENGTH]
+    if item is None:
+        context["error"] = ("Type the food item to count using letters, numbers, "
+                            f"spaces or hyphens (up to {MAX_ITEM_LENGTH} characters).")
+        return render_template("food_detection.html", **context), 400
+    context["item"] = item
+
     try:
-        image = read_uploaded_image("Choose an image before detecting.")
-        context["detections"] = _detect(image, context["threshold"])
+        image = read_uploaded_image("Choose an image before counting.")
+        context["detections"] = _count(image, item, context["threshold"])
     except UploadError as error:
         context["error"] = error.message
         return render_template("food_detection.html", **context), error.status
     except ImportError:
-        current_app.logger.exception("Food detector dependencies are missing")
-        context["error"] = ("The detection model needs PyTorch and Transformers. "
+        current_app.logger.exception("Food counter dependencies are missing")
+        context["error"] = ("The counting model needs PyTorch and Transformers. "
                             "Install requirements.txt and restart the server.")
         return render_template("food_detection.html", **context), 503
     except Exception:
-        current_app.logger.exception("Food detection failed")
-        context["error"] = ("Detection failed. The first run downloads the model, so "
+        current_app.logger.exception("Food counting failed")
+        context["error"] = ("Counting failed. The first run downloads the model, so "
                             "check the internet connection and the server logs.")
         return render_template("food_detection.html", **context), 500
 
-    context["food_count"] = sum(item["group"] == "food" for item in context["detections"])
     context["preview"] = jpeg_preview(_draw_boxes(image, context["detections"]))
     return render_template("food_detection.html", **context)

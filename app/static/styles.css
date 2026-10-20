@@ -215,7 +215,4 @@ th:last-child, td:last-child { padding-right: 0; }
 .detection-table { width: 100%; margin: 12px 0 18px; border-collapse: collapse; font-size: .9rem; }
 .detection-table th, .detection-table td { padding: 8px 10px; border-bottom: 1px solid #e7eee9; text-align: left; }
 .detection-table th { color: #657d6e; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
-.detection-tag { display: inline-block; padding: 2px 9px; border-radius: 999px; color: #fff; font-size: .76rem; font-weight: 700; }
-.detection-tag-food { background: #1f8a5b; }
-.detection-tag-tableware { background: #d08a1f; }
-.detection-tag-other { background: #6b7c86; }
+.detection-count { margin: 0 0 14px; color: #174e3b; font-size: 3rem; font-weight: 800; line-height: 1; }
