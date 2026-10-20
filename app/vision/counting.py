@@ -5,11 +5,18 @@ match. Unlike a COCO detector such as YOLOS, OWLv2 is not limited to a fixed
 list of classes, so it can count items it was never fine-tuned on.
 """
 
+import logging
 import re
 
-from flask import current_app, jsonify, render_template, request, url_for
+from fastapi import APIRouter, File, Form, Request, UploadFile
+from pydantic import BaseModel
 
 from app.vision.uploads import UploadError, read_uploaded_image
+from app.web import api_error, render, url_path
+
+
+logger = logging.getLogger(__name__)
+router = APIRouter(tags=["Food counting"])
 
 
 MODEL_NAME = "google/owlv2-base-patch16-ensemble"
@@ -27,12 +34,12 @@ DUPLICATE_IOU = 0.5
 DUPLICATE_CONTAINED = 0.8
 
 
-def _load_detector():
+def _load_detector(settings):
     """Build a ``detect(image, item, threshold)`` callable around OWLv2."""
     import torch
     from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
 
-    name = current_app.config.get("FOOD_COUNTER_MODEL_NAME", MODEL_NAME)
+    name = settings.get("FOOD_COUNTER_MODEL_NAME", MODEL_NAME)
     processor = AutoProcessor.from_pretrained(name)
     model = AutoModelForZeroShotObjectDetection.from_pretrained(name).eval()
 
@@ -54,15 +61,12 @@ def _load_detector():
     return detect
 
 
-def _get_detector():
-    """Load once per Flask app; tests may supply a detector through config."""
-    detector = current_app.config.get("FOOD_COUNTER")
-    if detector is not None:
-        return detector
-    detector = current_app.extensions.get("food_counter")
+def _get_detector(app):
+    """Load once per app; tests may supply a detector as settings["FOOD_COUNTER"]."""
+    detector = app.state.settings.get("FOOD_COUNTER") or getattr(app.state, "food_counter", None)
     if detector is None:
-        detector = _load_detector()
-        current_app.extensions["food_counter"] = detector
+        detector = _load_detector(app.state.settings)
+        app.state.food_counter = detector
     return detector
 
 
@@ -81,11 +85,11 @@ def _is_duplicate(box, kept):
             or overlap / min(_area(box), _area(kept)) >= DUPLICATE_CONTAINED)
 
 
-def _count(image, item, threshold):
+def _count(app, image, item, threshold):
     """Return one detection per item, strongest first, inside the photo."""
     width, height = image.size
     candidates = []
-    for found in _get_detector()(image, item, threshold / 100):
+    for found in _get_detector(app)(image, item, threshold / 100):
         x0, y0, x1, y1 = found["box"]
         box = (max(0.0, min(x0, x1)), max(0.0, min(y0, y1)),
                min(float(width), max(x0, x1)), min(float(height), max(y0, y1)))
@@ -100,29 +104,42 @@ def _count(image, item, threshold):
     return detections
 
 
-def _item_from_form():
+def _clean_item(raw: str) -> str | None:
     """Return the cleaned item name, or None if it is empty or unusable."""
-    item = " ".join(request.form.get("item", "").split()).lower()
+    item = " ".join(raw.split()).lower()
     if not item or len(item) > MAX_ITEM_LENGTH or not re.fullmatch(r"[a-z0-9 '\-]+", item):
         return None
     return item
 
 
-def _error(message, status):
-    return jsonify({"error": message}), status
+class ImageSize(BaseModel):
+    width: int
+    height: int
 
 
-def food_counting():
-    """``GET /food-counting`` - the React counting page."""
-    return render_template(
-        "_react_page.html",
+class Detection(BaseModel):
+    confidence: float
+    box: list[float]
+
+
+class FoodCount(BaseModel):
+    item: str
+    image: ImageSize
+    minConfidence: int
+    detections: list[Detection]
+
+
+@router.get("/food-counting", name="food_counting", include_in_schema=False)
+def food_counting(request: Request):
+    return render(
+        request, "_react_page.html",
         react_page="counting",
         active_page="food_counting",
         heading="Food counting",
         description=("Add a photo, type what to count, and check each item the model "
                      "pins. Counts are not saved as waste records."),
         settings={
-            "apiUrl": url_for("count_food"),
+            "apiUrl": url_path(request.app, "count_food"),
             "defaultItem": DEFAULT_ITEM,
             "quickItems": QUICK_ITEMS,
             "maxItemLength": MAX_ITEM_LENGTH,
@@ -132,43 +149,36 @@ def food_counting():
     )
 
 
-def count_food():
-    """``POST /api/food-count`` - count one kind of item in an uploaded photo.
-
-    Returns every match at or above ``MIN_CONFIDENCE`` with its box in the
-    photo's pixel coordinates. Nothing is saved.
-    """
+@router.post("/api/food-count", name="count_food", response_model=FoodCount,
+             summary="Count one kind of food item in a photo")
+def count_food(request: Request, image: UploadFile | None = File(None), item: str = Form("")):
+    """Returns every match at or above MIN_CONFIDENCE with its box in pixels. Nothing is saved."""
     try:
-        # Read the upload first: it sets the request size limit before the
-        # multipart body is parsed for the other form fields.
-        image = read_uploaded_image("Choose a photo before counting.")
+        photo = read_uploaded_image(image, "Choose a photo before counting.")
     except UploadError as error:
-        return _error(error.message, error.status)
+        return api_error(error.message, error.status)
 
-    item = _item_from_form()
-    if item is None:
-        return _error("Type the food item to count using letters, numbers, spaces "
-                      f"or hyphens (up to {MAX_ITEM_LENGTH} characters).", 400)
-
+    cleaned = _clean_item(item)
+    if cleaned is None:
+        return api_error("Type the food item to count using letters, numbers, spaces "
+                         f"or hyphens (up to {MAX_ITEM_LENGTH} characters).", 400)
     try:
-        detections = _count(image, item, MIN_CONFIDENCE)
+        detections = _count(request.app, photo, cleaned, MIN_CONFIDENCE)
     except ImportError:
-        current_app.logger.exception("Food counter dependencies are missing")
-        return _error("The counting model needs PyTorch and Transformers. "
-                      "Install requirements.txt and restart the server.", 503)
+        logger.exception("Food counter dependencies are missing")
+        return api_error("The counting model needs PyTorch and Transformers. "
+                         "Install requirements.txt and restart the server.", 503)
     except Exception:
-        current_app.logger.exception("Food counting failed")
-        return _error("Counting failed. The first run downloads the model, so "
-                      "check the internet connection and the server logs.", 500)
+        logger.exception("Food counting failed")
+        return api_error("Counting failed. The first run downloads the model, so "
+                         "check the internet connection and the server logs.", 500)
 
-    width, height = image.size
-    return jsonify({
-        "item": item,
-        "image": {"width": width, "height": height},
-        "minConfidence": MIN_CONFIDENCE,
-        "detections": [
-            {"confidence": round(found["confidence"], 1),
-             "box": [round(value, 1) for value in found["box"]]}
-            for found in detections
-        ],
-    })
+    width, height = photo.size
+    return FoodCount(
+        item=cleaned,
+        image=ImageSize(width=width, height=height),
+        minConfidence=MIN_CONFIDENCE,
+        detections=[Detection(confidence=round(found["confidence"], 1),
+                              box=[round(value, 1) for value in found["box"]])
+                    for found in detections],
+    )

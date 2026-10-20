@@ -1,28 +1,25 @@
 import pytest
 
-from app import create_app
-from app.database.connection import get_db, init_db
 from app.database.queries import get_user_by_username
 from app.database.seed import seed_demo_data
+from conftest import client, database, make_app, scalar, sql
 
 
 @pytest.fixture
 def app_with_demo(tmp_path):
-    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "test.sqlite3")})
-    with app.app_context():
-        init_db()
-        seed_demo_data(get_db())
+    app = make_app(tmp_path)
+    with database(app) as db:
+        seed_demo_data(db)
     return app
 
 
 def valid_form(app):
-    with app.app_context():
-        db = get_db()
+    with database(app) as db:
         return {
             "event_at": "2026-10-01T12:30",
-            "area_id": str(db.execute("SELECT id FROM areas WHERE name = 'Buffet'").fetchone()[0]),
-            "category_id": str(db.execute("SELECT id FROM categories WHERE name = 'Vegetables'").fetchone()[0]),
-            "reason_id": str(db.execute("SELECT id FROM reasons WHERE name = 'Spoilage'").fetchone()[0]),
+            "area_id": str(scalar(db, "SELECT id FROM areas WHERE name = 'Buffet'")),
+            "category_id": str(scalar(db, "SELECT id FROM categories WHERE name = 'Vegetables'")),
+            "reason_id": str(scalar(db, "SELECT id FROM reasons WHERE name = 'Spoilage'")),
             "quantity_kg": "2.75",
         }
 
@@ -30,17 +27,16 @@ def valid_form(app):
 def test_valid_submission_is_saved_and_success_is_shown(app_with_demo):
     app = app_with_demo
     form = valid_form(app)
-    response = app.test_client().post("/records/new", data=form)
+    response = client(app).post("/records/new", data=form)
 
     assert response.status_code == 303
-    assert "/records/new?created=" in response.headers["Location"]
-    success = app.test_client().get(response.headers["Location"])
+    assert "/records/new?created=" in response.headers["location"]
+    success = client(app).get(response.headers["location"])
     assert success.status_code == 200
-    assert b"saved successfully" in success.data
+    assert "saved successfully" in success.text
 
-    with app.app_context():
-        db = get_db()
-        row = db.execute("SELECT * FROM waste_records ORDER BY id DESC LIMIT 1").fetchone()
+    with database(app) as db:
+        row = sql(db, "SELECT * FROM waste_records ORDER BY id DESC LIMIT 1").mappings().one()
         assert row["event_at"] == "2026-10-01T07:00:00Z"
         assert row["quantity_kg"] == 2.75
         assert row["notes"] == ""
@@ -50,47 +46,44 @@ def test_valid_submission_is_saved_and_success_is_shown(app_with_demo):
 
 def test_invalid_entries_show_field_errors_and_save_nothing(app_with_demo):
     app = app_with_demo
-    client = app.test_client()
-    with app.app_context():
-        initial_count = get_db().execute("SELECT COUNT(*) FROM waste_records").fetchone()[0]
+    browser = client(app)
+    with database(app) as db:
+        initial_count = scalar(db, "SELECT COUNT(*) FROM waste_records")
 
-    missing = client.post("/records/new", data={})
+    missing = browser.post("/records/new", data={})
     assert missing.status_code == 400
-    assert b"Enter the date and time" in missing.data
-    assert b"Select a source area" in missing.data
-    assert b"Enter the quantity in kilograms" in missing.data
+    assert "Enter the date and time" in missing.text
+    assert "Select a source area" in missing.text
+    assert "Enter the quantity in kilograms" in missing.text
 
     bad_form = valid_form(app)
     bad_form.update(event_at="invalid", category_id="9999", quantity_kg="-2")
-    invalid = client.post("/records/new", data=bad_form)
+    invalid = browser.post("/records/new", data=bad_form)
     assert invalid.status_code == 400
-    assert b"valid local date and time" in invalid.data
-    assert b"valid food category" in invalid.data
-    assert b"greater than zero" in invalid.data
-    assert b'aria-invalid="true"' in invalid.data
+    assert "valid local date and time" in invalid.text
+    assert "valid food category" in invalid.text
+    assert "greater than zero" in invalid.text
+    assert 'aria-invalid="true"' in invalid.text
 
     bad_time = valid_form(app)
     bad_time["event_at"] = "2026-10-01"
-    assert b"valid local date and time" in client.post("/records/new", data=bad_time).data
+    assert "valid local date and time" in browser.post("/records/new", data=bad_time).text
 
     inactive_form = valid_form(app)
-    with app.app_context():
-        db = get_db()
-        db.execute("UPDATE categories SET active = 0 WHERE id = ?", (int(inactive_form["category_id"]),))
+    with database(app) as db:
+        sql(db, "UPDATE categories SET active = 0 WHERE id = :id", id=int(inactive_form["category_id"]))
         db.commit()
-    inactive = client.post("/records/new", data=inactive_form)
+    inactive = browser.post("/records/new", data=inactive_form)
     assert inactive.status_code == 400
-    assert b"Select a valid food category" in inactive.data
+    assert "Select a valid food category" in inactive.text
 
-    with app.app_context():
-        assert get_db().execute("SELECT COUNT(*) FROM waste_records").fetchone()[0] == initial_count
+    with database(app) as db:
+        assert scalar(db, "SELECT COUNT(*) FROM waste_records") == initial_count
 
 
 def test_missing_demo_entry_user_is_reported(tmp_path):
-    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "empty.sqlite3")})
-    with app.app_context():
-        init_db()
-    response = app.test_client().get("/records/new")
+    app = make_app(tmp_path, "empty.sqlite3")
+    response = client(app).get("/records/new")
     assert response.status_code == 503
-    assert b"Initialize and seed the local database first" in response.data
-    assert b'type="submit" disabled' in response.data
+    assert "Initialize and seed the local database first" in response.text
+    assert 'type="submit" disabled' in response.text

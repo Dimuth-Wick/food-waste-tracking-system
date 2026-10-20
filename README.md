@@ -63,7 +63,8 @@ The project uses large-scale hotels such as **The Kingsbury, Sri Lanka**, as a r
 | Component        | Technology                  |
 | ---------------- | --------------------------- |
 | Frontend         | HTML, CSS, JavaScript       |
-| Backend          | Python, Flask             |
+| Backend          | Python, FastAPI, Uvicorn  |
+| Database         | SQLAlchemy (SQLite by default, PostgreSQL-ready) |
 | Machine Learning | Python, Scikit-learn        |
 | Trained Model    | Pickle (.pkl)               |
 | Development      | VS Code, AI-assisted coding |
@@ -81,7 +82,7 @@ The current application follows this general architecture:
    (HTML, CSS, JavaScript)
             |
             v
-      Flask Backend
+     FastAPI Backend
             |
             v
     Machine Learning Model
@@ -94,7 +95,7 @@ The current application follows this general architecture:
        Web Dashboard
 ```
 
-The frontend provides the user interface, Flask handles backend requests, and the machine learning model generates food consumption predictions.
+The frontend provides the user interface, FastAPI handles backend requests, and the machine learning model generates food consumption predictions.
 
 ## 🤖 Machine Learning
 
@@ -119,10 +120,12 @@ To run the project locally:
 3. Set up a Python virtual environment.
 4. Install the required project dependencies.
 5. Make sure the trained machine learning model is available.
-6. Start the Flask app with `python run.py`.
+6. Start the app with `python run.py`.
 7. Open <http://127.0.0.1:5000/>.
 
-On Windows PowerShell, create a virtual environment with `py -3.12 -m venv .venv`, install dependencies with `.venv\Scripts\python.exe -m pip install -r requirements.txt`, and run with `.venv\Scripts\python.exe run.py`. Initialize a new database with `.venv\Scripts\python.exe -m flask --app run init-db --seed`.
+On Windows PowerShell, create a virtual environment with `py -3.12 -m venv .venv`, install dependencies with `.venv\Scripts\python.exe -m pip install -r requirements.txt`, and run with `.venv\Scripts\python.exe run.py`. Initialize a new database with demo data with `.venv\Scripts\python.exe scripts/init_db.py --seed`.
+
+The JSON APIs used by the React pages are documented, and can be tried out, at <http://127.0.0.1:5000/docs>.
 
 ## Temporary Food-101 image prediction
 
@@ -144,7 +147,7 @@ Counting works for separate items photographed from above. It does not work for 
 
 ### React frontend
 
-Three pages are React apps mounted inside the Flask layout. Their source is in [`frontend/src/`](frontend/src/), one folder per page:
+Three pages are React apps mounted inside the server-rendered layout. Their source is in [`frontend/src/`](frontend/src/), one folder per page:
 
 | Page | Source | JSON API it calls |
 |---|---|---|
@@ -152,7 +155,7 @@ Three pages are React apps mounted inside the Flask layout. Their source is in [
 | Food image prediction | `frontend/src/prediction/` | `POST /api/food-predict` |
 | Food counting | `frontend/src/counting/` | `POST /api/food-count` |
 
-The dashboard, records and record form stay as Flask templates. All pages share the colours and layout in `app/static/styles.css`: white sheets hold what people enter, and dark pine panels hold what the system answers.
+The dashboard, records and record form are Jinja templates rendered by FastAPI. All pages share the colours and layout in `app/static/styles.css`: white sheets hold what people enter, and dark pine panels hold what the system answers.
 
 The built files are committed in `app/static/react/`, so `python run.py` works without Node.js. To change the React code, install [Node.js](https://nodejs.org/), then:
 
@@ -168,6 +171,25 @@ To see the forecast history chart with sample data, run `python scripts/seed_dem
 
 Run tests with `.venv\Scripts\python.exe -m pip install -r requirements-dev.txt` and `.venv\Scripts\python.exe -m pytest -q --basetemp .pytest-run`.
 
+## 🗄️ Database
+
+The app uses SQLAlchemy, so it runs on the local SQLite file by default and on PostgreSQL by changing one setting. Large record lists are split into pages of 50, and dashboard totals are added up by the database.
+
+| Setting | Default | Example |
+|---|---|---|
+| `DATABASE_URL` | `sqlite:///instance/food_waste.sqlite3` | `postgresql+psycopg://user:password@localhost/food_waste` |
+
+To use PostgreSQL:
+
+```powershell
+.venv\Scripts\python.exe -m pip install "psycopg[binary]"
+$env:DATABASE_URL = "postgresql+psycopg://user:password@localhost/food_waste"
+.venv\Scripts\python.exe scripts/init_db.py --seed
+.venv\Scripts\python.exe run.py
+```
+
+`scripts/init_db.py` only creates missing tables, so it is safe to run on an existing database. Existing SQLite files from the earlier Flask version work without changes.
+
 ## 🧭 Project map
 
 Each backend feature has its own folder in `app/`, named after the page it serves. The React pages in `frontend/src/` use the same names.
@@ -175,24 +197,26 @@ Each backend feature has its own folder in `app/`, named after the page it serve
 ```text
 food-waste-tracking-system/
 ├── run.py                  Starts the web app (python run.py)
-├── app/                    Flask backend
-│   ├── __init__.py         create_app() and every page and API URL, in one place
-│   ├── database/           SQLite connection, schema, queries and demo seed data
+├── app/                    FastAPI backend
+│   ├── __init__.py         create_app(): builds the app and includes each feature's routes
+│   ├── config.py           Settings, such as DATABASE_URL
+│   ├── web.py              Shared page helpers: templates, URLs, error pages, upload size limit
+│   ├── database/           Tables (SQLAlchemy), connection, queries and demo seed data
 │   ├── waste_records/      Dashboard, Waste records, Add and Edit record pages
 │   ├── forecast/           Meal forecast page, its JSON APIs and the forecast model loader
 │   ├── vision/             Food image prediction and Food counting pages, shared upload checks
-│   ├── templates/          HTML for the Flask-rendered pages and the shared layout
+│   ├── templates/          HTML for the server-rendered pages and the shared layout
 │   └── static/             styles.css for every page; react/ holds the built React pages
 ├── frontend/               React source for three pages (Node.js only needed to change them)
 │   └── src/                forecast/, prediction/, counting/ and shared/
 ├── ml_models/              Trained model files: forecast (.pkl) and Food-101 classifier (.keras)
-├── scripts/                One-off helper scripts, such as seed_demo_history.py
+├── scripts/                init_db.py (create tables, demo data) and seed_demo_history.py
 └── tests/                  pytest tests, one file per feature
 ```
 
 Where to start:
 
-- **Change a page's URL or add a page:** `app/__init__.py`.
+- **Change a page's URL or add a page:** the `@router.get` / `@router.post` line above the view in its feature folder. A new feature's `router` is added to `ROUTERS` in `app/__init__.py`.
 - **Change the dashboard, records or record form:** `app/waste_records/` and `app/templates/`.
 - **Change the forecast, prediction or counting page:** the Python view in `app/forecast/` or `app/vision/`, and the matching React folder in `frontend/src/`. Then run `npm run build` in `frontend/`.
 - **Change colours or layout used everywhere:** `app/static/styles.css`.
@@ -202,7 +226,7 @@ Where to start:
 - [x] Identify the food waste management problem.
 - [x] Design the initial web application.
 - [x] Train a machine learning forecasting model.
-- [x] Connect the machine learning model to Flask.
+- [x] Connect the machine learning model to the backend.
 - [ ] Implement historical consumption charts.
 - [ ] Add interactive chart functionality.
 - [ ] Integrate automatic food recognition.

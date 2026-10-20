@@ -3,9 +3,8 @@
 import io
 import warnings
 
-from flask import request
+from fastapi import UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
-from werkzeug.exceptions import RequestEntityTooLarge
 
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
@@ -21,17 +20,15 @@ class UploadError(Exception):
         self.status = status
 
 
-def read_uploaded_image(missing_message, field="image"):
-    """Return the uploaded file as an upright RGB image or raise UploadError."""
-    request.max_content_length = MAX_IMAGE_BYTES + 1024 * 1024
-    try:
-        uploaded = request.files.get(field)
-    except RequestEntityTooLarge:
-        raise UploadError(TOO_LARGE_MESSAGE, 413) from None
-    if uploaded is None or not uploaded.filename:
+def read_uploaded_image(upload: UploadFile | None, missing_message: str):
+    """Return the uploaded file as an upright RGB image or raise UploadError.
+
+    Requests over 9 MB are already refused by app.web.RequestSizeLimit.
+    """
+    if upload is None or not upload.filename:
         raise UploadError(missing_message, 400)
 
-    data = uploaded.stream.read(MAX_IMAGE_BYTES + 1)
+    data = upload.file.read(MAX_IMAGE_BYTES + 1)
     if not data or len(data) > MAX_IMAGE_BYTES:
         raise UploadError(TOO_LARGE_MESSAGE, 400)
 

@@ -1,88 +1,83 @@
-"""Create a food waste record through the local demo form."""
+"""Add waste record page: the entry form and saving a new record."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from math import isfinite
+import logging
 import re
-import sqlite3
 
-from flask import current_app, redirect, render_template, request, url_for
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import RedirectResponse
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
-from app.database.connection import get_db
-from app.database.queries import (
-    create_waste_record,
-    get_user_by_username,
-    get_waste_record,
-    list_lookup_items,
-)
+from app.database.connection import get_session
+from app.database.queries import create_waste_record, get_user_by_username, get_waste_record
+from app.waste_records.common import DEMO_TIMEZONE, DEMO_USERNAME, load_lookups, parse_id
+from app.web import render, url_path
 
 
-DEMO_TIMEZONE = timezone(timedelta(hours=5, minutes=30))
+logger = logging.getLogger(__name__)
+router = APIRouter(include_in_schema=False)
 FIELD_NAMES = ("event_at", "area_id", "category_id", "reason_id", "quantity_kg")
 
 
-def _parse_id(raw: str) -> int | None:
-    """Accept only SQLite-sized positive decimal IDs from forms and query strings."""
-    if not re.fullmatch(r"[0-9]{1,19}", raw):
-        return None
-    value = int(raw)
-    return value if 0 < value <= 2**63 - 1 else None
+class RecordForm:
+    """The five form fields, as submitted text. Validation happens in parse_form."""
+
+    def __init__(self, event_at: str = Form(""), area_id: str = Form(""),
+                 category_id: str = Form(""), reason_id: str = Form(""),
+                 quantity_kg: str = Form("")):
+        self.values = {name: value.strip() for name, value in zip(
+            FIELD_NAMES, (event_at, area_id, category_id, reason_id, quantity_kg))}
 
 
-def _render_form(*, areas, categories, reasons, actor_name, values=None, errors=None,
-                 message=None, saved_record=None, status=200, editing=False, record_id=None):
-    return render_template(
-        "new_record.html",
+def render_form(request: Request, *, areas, categories, reasons, actor_name, values=None,
+                errors=None, message=None, saved_record=None, status_code=200,
+                editing=False, record_id=None):
+    return render(
+        request, "new_record.html", status_code,
         active_page="records" if editing else "new_record",
-        areas=areas,
-        categories=categories,
-        reasons=reasons,
-        actor_name=actor_name,
-        values=values or {},
-        errors=errors or {},
-        message=message,
-        saved_record=saved_record,
-        editing=editing,
-        record_id=record_id,
-    ), status
+        areas=areas, categories=categories, reasons=reasons, actor_name=actor_name,
+        values=values or {}, errors=errors or {}, message=message,
+        saved_record=saved_record, editing=editing, record_id=record_id,
+    )
 
 
-def _parse_form(values, lookups):
+def parse_form(values, lookups):
+    """Check the submitted fields. Returns (errors, event_at, selected ids, quantity)."""
     errors = {}
 
     raw_time = values["event_at"]
+    event_at = None
     if not raw_time:
         errors["event_at"] = "Enter the date and time of the waste event."
-        event_at = None
     else:
         try:
             if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", raw_time):
                 raise ValueError("Expected date and time")
-            local_time = datetime.fromisoformat(raw_time)
-            if local_time.tzinfo is not None:
+            moment = datetime.fromisoformat(raw_time)
+            if moment.tzinfo is not None:
                 raise ValueError("Expected local time")
-            event_at = local_time.replace(tzinfo=DEMO_TIMEZONE)
+            event_at = moment.replace(tzinfo=DEMO_TIMEZONE)
         except ValueError:
             errors["event_at"] = "Enter a valid local date and time."
-            event_at = None
 
     selected_ids = {}
-    for field, label, items in (
-        ("area_id", "source area", lookups["areas"]),
-        ("category_id", "food category", lookups["categories"]),
-        ("reason_id", "reason for waste", lookups["reasons"]),
-    ):
+    for field, label, items in (("area_id", "source area", lookups["areas"]),
+                                ("category_id", "food category", lookups["categories"]),
+                                ("reason_id", "reason for waste", lookups["reasons"])):
         raw_id = values[field]
         if not raw_id:
             errors[field] = f"Select a {label}."
-        elif (parsed_id := _parse_id(raw_id)) not in {item.id for item in items}:
+        elif (parsed := parse_id(raw_id)) not in {item.id for item in items}:
             errors[field] = f"Select a valid {label}."
         else:
-            selected_ids[field] = parsed_id
+            selected_ids[field] = parsed
 
     raw_quantity = values["quantity_kg"]
+    quantity_kg = None
     if not raw_quantity:
         errors["quantity_kg"] = "Enter the quantity in kilograms."
-        quantity_kg = None
     else:
         try:
             quantity_kg = float(raw_quantity)
@@ -95,69 +90,60 @@ def _parse_form(values, lookups):
     return errors, event_at, selected_ids, quantity_kg
 
 
-def new_record():
-    values = {name: request.form.get(name, "").strip() for name in FIELD_NAMES}
-    try:
-        connection = get_db()
-        lookups = {
-            table: [item for item in list_lookup_items(connection, table) if item.active]
-            for table in ("areas", "categories", "reasons")
-        }
-        actor = get_user_by_username(connection, "demo_entry")
-    except sqlite3.Error:
-        current_app.logger.exception("Could not load the waste entry form")
-        return _render_form(
-            areas=[], categories=[], reasons=[], actor_name=None,
-            message="The database is unavailable. Initialize it and try again.", status=503,
-        )
+def _load(request: Request, db: Session, values):
+    """Load the form's choices and demo user.
 
-    form_context = {
-        "areas": lookups["areas"],
-        "categories": lookups["categories"],
-        "reasons": lookups["reasons"],
-        "actor_name": actor.name if actor else None,
-        "values": values,
-    }
-    if actor is None or not actor.active or actor.role != "entry" or any(
-        not items for items in lookups.values()
-    ):
-        return _render_form(
-            **form_context,
+    Returns ((lookups, actor, form context), None), or (None, error page).
+    """
+    try:
+        lookups = load_lookups(db, active_only=True)
+        actor = get_user_by_username(db, DEMO_USERNAME)
+    except SQLAlchemyError:
+        logger.exception("Could not load the waste entry form")
+        return None, render_form(
+            request, areas=[], categories=[], reasons=[], actor_name=None,
+            message="The database is unavailable. Initialize it and try again.", status_code=503,
+        )
+    context = {**lookups, "actor_name": actor.name if actor else None, "values": values}
+    if actor is None or not actor.active or actor.role != "entry" or not all(lookups.values()):
+        return None, render_form(
+            request, **context, status_code=503,
             message="Demo entry data is missing. Initialize and seed the local database first.",
-            status=503,
         )
+    return (lookups, actor, context), None
 
-    if request.method == "GET":
-        raw_created = request.args.get("created", "")
-        saved_record = None
-        created_id = _parse_id(raw_created)
-        if created_id is not None:
-            try:
-                saved_record = get_waste_record(connection, created_id)
-            except sqlite3.Error:
-                current_app.logger.exception("Could not read saved waste record")
-        return _render_form(**form_context, saved_record=saved_record)
 
-    errors, event_at, selected_ids, quantity_kg = _parse_form(values, lookups)
+@router.get("/records/new", name="new_record")
+def new_record_page(request: Request, created: str = "", db: Session = Depends(get_session)):
+    loaded, error_page = _load(request, db, {name: "" for name in FIELD_NAMES})
+    if error_page:
+        return error_page
+    _, _, context = loaded
+    saved_record = None
+    if (created_id := parse_id(created)) is not None:
+        try:
+            saved_record = get_waste_record(db, created_id)
+        except SQLAlchemyError:
+            logger.exception("Could not read saved waste record")
+    return render_form(request, **context, saved_record=saved_record)
+
+
+@router.post("/records/new", name="save_new_record")
+def save_new_record(request: Request, form: RecordForm = Depends(),
+                    db: Session = Depends(get_session)):
+    loaded, error_page = _load(request, db, form.values)
+    if error_page:
+        return error_page
+    lookups, actor, context = loaded
+
+    errors, event_at, selected_ids, quantity_kg = parse_form(form.values, lookups)
     if errors:
-        return _render_form(**form_context, errors=errors, status=400)
-
+        return render_form(request, **context, errors=errors, status_code=400)
     try:
-        record = create_waste_record(
-            connection,
-            event_at=event_at,
-            area_id=selected_ids["area_id"],
-            category_id=selected_ids["category_id"],
-            reason_id=selected_ids["reason_id"],
-            quantity_kg=quantity_kg,
-            user_id=actor.id,
-        )
-    except (sqlite3.Error, ValueError):
-        current_app.logger.exception("Could not save waste record")
-        return _render_form(
-            **form_context,
-            message="The record could not be saved. Check the details and try again.",
-            status=500,
-        )
-
-    return redirect(url_for("new_record", created=record.id), code=303)
+        record = create_waste_record(db, event_at=event_at, quantity_kg=quantity_kg,
+                                     user_id=actor.id, **selected_ids)
+    except (SQLAlchemyError, ValueError):
+        logger.exception("Could not save waste record")
+        return render_form(request, **context, status_code=500,
+                           message="The record could not be saved. Check the details and try again.")
+    return RedirectResponse(url_path(request.app, "new_record", created=record.id), status_code=303)

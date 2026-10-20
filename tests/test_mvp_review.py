@@ -2,117 +2,96 @@
 
 from datetime import datetime
 
-from app import create_app
-from app.database.connection import get_db, init_db
-from app.waste_records.add_record import DEMO_TIMEZONE
 from app.database.queries import create_user, get_waste_record
-
-
-def _review_app(database_path):
-    return create_app({"TESTING": True, "DATABASE": str(database_path)})
+from app.waste_records.common import DEMO_TIMEZONE
+from conftest import add_lookups, client, database, make_app
 
 
 def _prepare_database(app):
-    with app.app_context():
-        init_db()
-        db = get_db()
-        for table, name in (
-            ("areas", "Buffet"),
-            ("categories", "Vegetables"),
-            ("reasons", "Spoilage"),
-        ):
-            db.execute(f"INSERT INTO {table} (name) VALUES (?)", (name,))
-        db.commit()
+    with database(app) as db:
+        add_lookups(db, {"areas": ["Buffet"], "categories": ["Vegetables"], "reasons": ["Spoilage"]})
         create_user(db, name="Demo Kitchen Staff", username="demo_entry",
                     password="temporary test password", role="entry")
 
 
 def _form(quantity="2.5"):
-    return {
-        "event_at": "2026-10-02T12:30",
-        "area_id": "1",
-        "category_id": "1",
-        "reason_id": "1",
-        "quantity_kg": quantity,
-    }
+    return {"event_at": "2026-10-02T12:30", "area_id": "1", "category_id": "1",
+            "reason_id": "1", "quantity_kg": quantity}
 
 
 def test_complete_record_flow_persists_after_reopening_app(tmp_path, monkeypatch):
     monkeypatch.setattr("app.waste_records.dashboard._now_local",
                         lambda: datetime(2026, 10, 2, 15, tzinfo=DEMO_TIMEZONE))
-    database_path = tmp_path / "review.sqlite3"
-    app = _review_app(database_path)
+    app = make_app(tmp_path, "review.sqlite3")
     _prepare_database(app)
-    client = app.test_client()
+    browser = client(app)
 
-    assert client.get("/").status_code == 200
-    assert b"Add waste record" in client.get("/").data
-    assert client.get("/records/new").status_code == 200
+    assert browser.get("/").status_code == 200
+    assert "Add waste record" in browser.get("/").text
+    assert browser.get("/records/new").status_code == 200
 
-    saved = client.post("/records/new", data=_form())
+    saved = browser.post("/records/new", data=_form())
     assert saved.status_code == 303
-    assert b"saved successfully" in client.get(saved.headers["Location"]).data
-    listing = client.get("/records")
-    assert b"FW-001" in listing.data
-    assert b"2.5 kg" in listing.data
-    assert b"/records/1/edit" in listing.data
-    dashboard = client.get("/").get_data(as_text=True)
+    assert "saved successfully" in browser.get(saved.headers["location"]).text
+    listing = browser.get("/records").text
+    assert "FW-001" in listing
+    assert "2.5 kg" in listing
+    assert "/records/1/edit" in listing
+    dashboard = browser.get("/").text
     assert "2.50" in dashboard
     assert "Buffet: 2.50 kilograms" in dashboard
 
-    edit_form = client.get("/records/1/edit")
+    edit_form = browser.get("/records/1/edit")
     assert edit_form.status_code == 200
-    assert b'value="2.5"' in edit_form.data
-    changed = _form("4")
-    updated = client.post("/records/1/edit", data=changed)
+    assert 'value="2.5"' in edit_form.text
+    updated = browser.post("/records/1/edit", data=_form("4"))
     assert updated.status_code == 303
-    assert b"updated successfully" in client.get(updated.headers["Location"]).data
-    assert b"4 kg" in client.get("/records").data
-    assert "4.00" in client.get("/").get_data(as_text=True)
+    assert "updated successfully" in browser.get(updated.headers["location"]).text
+    assert "4 kg" in browser.get("/records").text
+    assert "4.00" in browser.get("/").text
 
-    invalid = client.post("/records/1/edit", data=_form("0"))
+    invalid = browser.post("/records/1/edit", data=_form("0"))
     assert invalid.status_code == 400
-    assert b"greater than zero" in invalid.data
-    assert b"4 kg" in client.get("/records").data
-    assert client.post("/records/new", data={}).status_code == 400
+    assert "greater than zero" in invalid.text
+    assert "4 kg" in browser.get("/records").text
+    assert browser.post("/records/new", data={}).status_code == 400
 
-    reopened = _review_app(database_path).test_client()
-    assert b"FW-001" in reopened.get("/records").data
-    assert "4.00" in reopened.get("/").get_data(as_text=True)
-    with app.app_context():
-        record = get_waste_record(get_db(), 1)
+    reopened = client(make_app(tmp_path, "review.sqlite3", initialize=False))
+    assert "FW-001" in reopened.get("/records").text
+    assert "4.00" in reopened.get("/").text
+    with database(app) as db:
+        record = get_waste_record(db, 1)
         assert record.quantity_kg == 4
         assert record.event_at == "2026-10-02T07:00:00Z"
 
 
 def test_oversized_identifiers_return_validation_errors(tmp_path):
-    app = _review_app(tmp_path / "ids.sqlite3")
+    app = make_app(tmp_path, "ids.sqlite3")
     _prepare_database(app)
-    client = app.test_client()
+    browser = client(app)
     too_long = "9" * 5000
 
     bad_form = _form()
     bad_form["area_id"] = too_long
-    response = client.post("/records/new", data=bad_form)
+    response = browser.post("/records/new", data=bad_form)
     assert response.status_code == 400
-    assert b"Select a valid source area" in response.data
+    assert "Select a valid source area" in response.text
 
-    filtered = client.get("/records?category_id=" + too_long)
+    filtered = browser.get("/records?category_id=" + too_long)
     assert filtered.status_code == 400
-    assert b"Select a valid category" in filtered.data
+    assert "Select a valid category" in filtered.text
 
-    dashboard = client.get("/?reason_id=" + too_long)
+    dashboard = browser.get("/?reason_id=" + too_long)
     assert dashboard.status_code == 400
-    assert b"Select a valid reason" in dashboard.data
+    assert "Select a valid reason" in dashboard.text
 
-    assert client.get("/records/new?created=" + too_long).status_code == 200
-    assert client.get("/records/99999999999999999999/edit").status_code == 404
+    assert browser.get("/records/new?created=" + too_long).status_code == 200
+    assert browser.get("/records/99999999999999999999/edit").status_code == 404
 
 
 def test_uninitialized_database_shows_service_error_instead_of_crashing(tmp_path):
-    app = _review_app(tmp_path / "not_initialized.sqlite3")
-    client = app.test_client()
+    browser = client(make_app(tmp_path, "not_initialized.sqlite3", initialize=False))
     for path in ("/", "/records", "/records/new", "/records/1/edit"):
-        response = client.get(path)
+        response = browser.get(path)
         assert response.status_code == 503
-        assert b"Traceback" not in response.data
+        assert "Traceback" not in response.text

@@ -1,8 +1,6 @@
-"""Load and expose the trained food-demand forecasting model.
+"""Load the trained food-demand forecasting model once, at startup.
 
-The scikit-learn pipeline is loaded once when the Flask application starts
-and stored on ``app.config`` so any view (e.g. the future forecast page)
-can retrieve it without reloading from disk on every request.
+The scikit-learn pipeline is stored on ``app.state.forecast_model``.
 
 Expected model inputs (pandas DataFrame columns):
     - Meal type   (str)
@@ -13,42 +11,32 @@ Model output:
     - Consumed quantity (float)
 """
 
+import logging
 from pathlib import Path
 
 import joblib
-from flask import current_app
+from fastapi import FastAPI, Request
+
+from app.config import PROJECT_ROOT
 
 
+logger = logging.getLogger(__name__)
 MODEL_FILENAME = "food_demand_model.pkl"
 
 
-def _default_model_path(app):
-    """Resolve the model file path relative to the project root."""
-    # app.root_path points to the ``app/`` package directory.
-    project_root = Path(app.root_path).parent
-    return project_root / "ml_models" / MODEL_FILENAME
+def init_app(app: FastAPI) -> None:
+    """Load the model into app.state.
 
-
-def init_app(app):
-    """Load the trained model at startup and attach it to the app config.
-
-    Call this inside the application factory **after** the app is created.
-    Raises ``FileNotFoundError`` with a clear message if the ``.pkl`` file
-    is missing so the developer gets immediate feedback rather than a
-    cryptic error on the first prediction request.
-
-    When ``TESTING`` is enabled or ``ML_MODEL_SKIP`` is set to ``True``
-    in the app config the model loading step is silently skipped so that
-    existing tests keep working without requiring the ``.pkl`` file.
+    Skipped when TESTING or ML_MODEL_SKIP is set, so tests and pages that do
+    not need the forecast can run without the .pkl file. A model object can
+    also be passed directly as settings["ML_MODEL"].
     """
-    if app.config.get("TESTING") or app.config.get("ML_MODEL_SKIP"):
-        app.logger.info("ML model loading skipped (TESTING or ML_MODEL_SKIP).")
+    settings = app.state.settings
+    app.state.forecast_model = settings.get("ML_MODEL")
+    if app.state.forecast_model is not None or settings.get("TESTING") or settings.get("ML_MODEL_SKIP"):
         return
 
-    model_path = Path(
-        app.config.get("ML_MODEL_PATH", _default_model_path(app))
-    )
-
+    model_path = Path(settings.get("ML_MODEL_PATH", PROJECT_ROOT / "ml_models" / MODEL_FILENAME))
     if not model_path.exists():
         raise FileNotFoundError(
             f"\n\n"
@@ -58,21 +46,13 @@ def init_app(app):
             f"      ml_models/{MODEL_FILENAME}\n"
             f"  (relative to the project root)\n"
         )
+    app.state.forecast_model = joblib.load(model_path)
+    logger.info("Forecast model loaded from %s", model_path)
 
-    app.config["ML_MODEL"] = joblib.load(model_path)
-    app.logger.info("ML model loaded from %s", model_path)
 
-
-def get_model():
-    """Return the loaded model from the current Flask application context.
-
-    Usage from any view or module:
-
-        from app.forecast.model import get_model
-        model = get_model()
-        prediction = model.predict(df)
-    """
-    model = current_app.config.get("ML_MODEL")
+def get_model(request: Request):
+    """Return the loaded forecast model, or raise if it was not loaded."""
+    model = request.app.state.forecast_model
     if model is None:
         raise RuntimeError(
             "The ML model is not available. "

@@ -3,8 +3,8 @@ import io
 import numpy as np
 from PIL import Image
 
-from app import create_app
 from app.vision import prediction
+from conftest import client, make_app
 
 
 class FakeFoodModel:
@@ -24,28 +24,21 @@ def _image_bytes():
 
 
 def test_food_prediction_page_and_image_upload(monkeypatch, tmp_path):
-    app = create_app({
-        "TESTING": True,
-        "DATABASE": str(tmp_path / "test.sqlite3"),
-        "FOOD_CLASSIFIER_MODEL": FakeFoodModel(),
-    })
+    app = make_app(tmp_path, FOOD_CLASSIFIER_MODEL=FakeFoodModel())
     monkeypatch.setattr(prediction, "_prepare_image", lambda image: np.zeros((1, 224, 224, 3)))
-    client = app.test_client()
-    page = client.get("/food-prediction")
+    browser = client(app)
+    page = browser.get("/food-prediction")
     assert page.status_code == 200
-    html = page.get_data(as_text=True)
+    html = page.text
     assert "<h1>Food image prediction</h1>" in html
     assert 'aria-current="page"' in html
     assert "react/prediction.js" in html
     assert "/api/food-predict" in html
 
-    result = client.post(
-        "/api/food-predict",
-        data={"image": (_image_bytes(), "sample.png")},
-        content_type="multipart/form-data",
-    )
+    result = browser.post("/api/food-predict",
+                          files={"image": ("sample.png", _image_bytes(), "image/png")})
     assert result.status_code == 200
-    assert result.get_json()["predictions"] == [
+    assert result.json()["predictions"] == [
         {"label": "Pizza", "confidence": 82.0},
         {"label": "Hamburger", "confidence": 12.0},
         {"label": "Tacos", "confidence": 6.0},
@@ -53,19 +46,15 @@ def test_food_prediction_page_and_image_upload(monkeypatch, tmp_path):
 
 
 def test_food_prediction_rejects_missing_and_invalid_uploads(tmp_path):
-    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "test.sqlite3")})
-    client = app.test_client()
-    missing = client.post("/api/food-predict", data={})
+    browser = client(make_app(tmp_path))
+    missing = browser.post("/api/food-predict", data={})
     assert missing.status_code == 400
-    assert "Choose a food photo" in missing.get_json()["error"]
-    result = client.post(
-        "/api/food-predict",
-        data={"image": (io.BytesIO(b"not an image"), "fake.jpg")},
-        content_type="multipart/form-data",
-    )
+    assert "Choose a food photo" in missing.json()["error"]
+    result = browser.post("/api/food-predict",
+                          files={"image": ("fake.jpg", b"not an image", "image/jpeg")})
     assert result.status_code == 400
-    assert "not a valid image" in result.get_json()["error"]
-    assert client.post("/food-prediction").status_code == 405
+    assert "not a valid image" in result.json()["error"]
+    assert browser.post("/food-prediction").status_code == 405
 
 
 def test_food101_label_order():

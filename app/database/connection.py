@@ -1,59 +1,49 @@
-import sqlite3
+"""Database engine and per-request sessions.
+
+The engine comes from settings["DATABASE_URL"], so the same code runs on the
+local SQLite file or on PostgreSQL. Each request gets its own session through
+the ``get_session`` FastAPI dependency.
+"""
+
 from pathlib import Path
 
-import click
-from flask import current_app, g
+from fastapi import Request
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine, make_url
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.database.tables import Base
 
 
-SCHEMA_VERSION = 1
+def create_database_engine(database_url: str) -> Engine:
+    url = make_url(database_url)
+    if url.get_backend_name() == "sqlite":
+        if url.database and url.database != ":memory:":
+            Path(url.database).parent.mkdir(parents=True, exist_ok=True)
+        engine = create_engine(url, connect_args={"check_same_thread": False})
+
+        @event.listens_for(engine, "connect")
+        def _enforce_foreign_keys(connection, _record):
+            # SQLite ignores foreign keys unless each connection turns them on.
+            connection.execute("PRAGMA foreign_keys = ON")
+
+        return engine
+    return create_engine(url, pool_pre_ping=True)
 
 
-def get_db():
-    if "db" not in g:
-        database = Path(current_app.config["DATABASE"])
-        database.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(database)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        g.db = connection
-    return g.db
+def make_session_factory(engine: Engine) -> sessionmaker[Session]:
+    return sessionmaker(bind=engine, expire_on_commit=False)
 
 
-def close_db(error=None):
-    connection = g.pop("db", None)
-    if connection is not None:
-        connection.close()
+def get_session(request: Request):
+    """FastAPI dependency: one database session per request, always closed."""
+    session = request.app.state.session_factory()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
-def init_db():
-    connection = get_db()
-    version = connection.execute("PRAGMA user_version").fetchone()[0]
-    if version == SCHEMA_VERSION:
-        return
-    if version != 0:
-        raise RuntimeError(f"Unsupported database schema version: {version}")
-
-    schema = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
-    connection.executescript(schema)
-    connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-    connection.commit()
-
-
-@click.command("init-db")
-@click.option("--seed", is_flag=True, help="Add synthetic development data.")
-def init_db_command(seed):
-    """Initialize the local SQLite database."""
-    init_db()
-    click.echo("Database schema ready.")
-    if seed:
-        from app.database.seed import seed_demo_data
-
-        credentials = seed_demo_data(get_db())
-        click.echo("Synthetic demo data added. Save these one-time passwords:")
-        for username, password in credentials.items():
-            click.echo(f"  {username}: {password}")
-
-
-def init_app(app):
-    app.teardown_appcontext(close_db)
-    app.cli.add_command(init_db_command)
+def init_db(engine: Engine) -> None:
+    """Create any missing tables and indexes. Safe to run more than once."""
+    Base.metadata.create_all(engine)

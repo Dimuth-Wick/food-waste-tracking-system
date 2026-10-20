@@ -143,6 +143,8 @@ th:last-child, td:last-child { padding-right: 0; }
 .records-panel table { min-width: 860px; }
 th small { font-weight: 500; }
 
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; padding-top: 18px; border-top: 1px solid #edf1ed; }
+.pager-status { color: var(--muted); font-size: .88rem; font-variant-numeric: tabular-nums; }
 .empty-state { padding: 48px 24px; text-align: center; }
 .empty-state h3 { margin: 0 0 8px; color: var(--ink); font-size: 1.1rem; }
 .empty-state p { max-width: 28rem; margin: 0 auto 20px; color: var(--muted); font-size: .92rem; line-height: 1.55; }

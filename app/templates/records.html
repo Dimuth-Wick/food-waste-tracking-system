@@ -21,7 +21,7 @@
 <section class="sheet records-panel" aria-labelledby="records-title">
   <div class="sheet-heading">
     <h2 id="records-title">Recorded waste</h2>
-    <span class="record-count">{{ records|length }} {{ 'record' if records|length == 1 else 'records' }}</span>
+    <span class="record-count">{% if pager %}Showing {{ pager.first }}–{{ pager.last }} of {% endif %}{{ total }} {{ 'record' if total == 1 else 'records' }}</span>
   </div>
   {% if records %}
   <div class="table-scroll">
@@ -45,6 +45,13 @@
       </tbody>
     </table>
   </div>
+  {% if pager %}
+  <nav class="pager" aria-label="Record pages">
+    {% if pager.previous %}<a class="button button-secondary" href="{{ pager.previous }}">Newer records</a>{% else %}<span></span>{% endif %}
+    <span class="pager-status">Page {{ pager.page }} of {{ pager.pages }}</span>
+    {% if pager.next %}<a class="button button-secondary" href="{{ pager.next }}">Older records</a>{% else %}<span></span>{% endif %}
+  </nav>
+  {% endif %}
   {% else %}
   <div class="empty-state">
     {% if database_error %}

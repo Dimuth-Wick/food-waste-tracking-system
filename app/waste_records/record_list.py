@@ -1,116 +1,66 @@
-"""Display saved waste records with the plan's basic filters."""
+"""Waste records page: every record, newest first, filtered and split into pages."""
 
-from datetime import date, datetime, time, timedelta, timezone
-import re
-import sqlite3
+import logging
 
-from flask import current_app, render_template, request
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
-from app.database.connection import get_db
-from app.waste_records.add_record import DEMO_TIMEZONE, _parse_id
-from app.waste_records.edit_record import can_edit
-from app.database.queries import get_user_by_username, list_lookup_items, list_waste_records
-
-
-FILTER_FIELDS = ("start_date", "end_date", "area_id", "category_id", "reason_id")
-
-
-def _utc_boundary(local_date: date) -> str:
-    return datetime.combine(local_date, time.min, tzinfo=DEMO_TIMEZONE).astimezone(
-        timezone.utc
-    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+from app.database.connection import get_session
+from app.database.queries import count_waste_records, get_user_by_username, list_waste_records
+from app.waste_records.common import (
+    DEMO_USERNAME,
+    FILTER_FIELDS,
+    can_edit,
+    display_row,
+    load_lookups,
+    parse_filters,
+)
+from app.web import render, url_path
 
 
-def _parse_filters(values, lookups):
-    errors = {}
-    parsed = {}
-
-    for field, label in (("start_date", "From date"), ("end_date", "To date")):
-        raw = values[field]
-        if raw:
-            try:
-                if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
-                    raise ValueError("Invalid date format")
-                parsed[field] = date.fromisoformat(raw)
-            except ValueError:
-                errors[field] = f"{label} must be a valid date."
-
-    if "start_date" in parsed and "end_date" in parsed:
-        if parsed["start_date"] > parsed["end_date"]:
-            errors["end_date"] = "To date must be on or after From date."
-
-    for field, label, table in (
-        ("area_id", "area", "areas"),
-        ("category_id", "category", "categories"),
-        ("reason_id", "reason", "reasons"),
-    ):
-        raw = values[field]
-        if raw:
-            if (parsed_id := _parse_id(raw)) not in {item.id for item in lookups[table]}:
-                errors[field] = f"Select a valid {label}."
-            else:
-                parsed[field] = parsed_id
-
-    return errors, parsed
+logger = logging.getLogger(__name__)
+router = APIRouter(include_in_schema=False)
+PAGE_SIZE = 50
 
 
-def records():
-    values = {field: request.args.get(field, "").strip() for field in FILTER_FIELDS}
+def _page_number(raw: str) -> int:
+    return int(raw) if raw.isdigit() and 0 < int(raw) < 10**6 else 1
+
+
+@router.get("/records", name="records")
+def records(request: Request, db: Session = Depends(get_session)):
+    values = {field: request.query_params.get(field, "").strip() for field in FILTER_FIELDS}
+    context = {"active_page": "records", "records": [], "values": values, "errors": {},
+               "areas": [], "categories": [], "reasons": [], "database_error": False,
+               "has_filters": any(values.values()), "total": 0, "pager": None}
     try:
-        connection = get_db()
-        lookups = {
-            table: list_lookup_items(connection, table)
-            for table in ("areas", "categories", "reasons")
-        }
-        actor = get_user_by_username(connection, "demo_entry")
-    except sqlite3.Error:
-        current_app.logger.exception("Could not load waste records")
-        return render_template(
-            "records.html", active_page="records", records=[], areas=[], categories=[],
-            reasons=[], values=values, errors={}, database_error=True,
-        ), 503
+        lookups = load_lookups(db)
+        context.update(lookups)
+        errors, filters = parse_filters(values, lookups)
+        context["errors"] = errors
+        if errors:
+            return render(request, "records.html", 400, **context)
 
-    errors, parsed = _parse_filters(values, lookups)
-    records_for_display = []
-    if not errors:
-        try:
-            rows = list_waste_records(
-                connection,
-                start_at_utc=_utc_boundary(parsed["start_date"]) if "start_date" in parsed else None,
-                end_before_utc=_utc_boundary(parsed["end_date"] + timedelta(days=1))
-                if "end_date" in parsed and parsed["end_date"] < date.max else None,
-                area_id=parsed.get("area_id"),
-                category_id=parsed.get("category_id"),
-                reason_id=parsed.get("reason_id"),
-            )
-        except sqlite3.Error:
-            current_app.logger.exception("Could not query waste records")
-            return render_template(
-                "records.html", active_page="records", records=[],
-                areas=lookups["areas"], categories=lookups["categories"],
-                reasons=lookups["reasons"], values=values, errors={}, database_error=True,
-            ), 503
+        actor = get_user_by_username(db, DEMO_USERNAME)
+        total = count_waste_records(db, filters)
+        pages = max(1, -(-total // PAGE_SIZE))
+        page = min(_page_number(request.query_params.get("page", "")), pages)
+        rows = list_waste_records(db, filters, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
+    except SQLAlchemyError:
+        logger.exception("Could not load waste records")
+        context["database_error"] = True
+        return render(request, "records.html", 503, **context)
 
-        for row in rows:
-            local_time = datetime.fromisoformat(row["event_at"].replace("Z", "+00:00")).astimezone(
-                DEMO_TIMEZONE
-            )
-            records_for_display.append({
-                **row,
-                "date": local_time.strftime("%d %b %Y"),
-                "time": local_time.strftime("%H:%M"),
-                "can_edit": can_edit(actor, row["user_id"]),
-            })
-
-    return render_template(
-        "records.html",
-        active_page="records",
-        records=records_for_display,
-        areas=lookups["areas"],
-        categories=lookups["categories"],
-        reasons=lookups["reasons"],
-        values=values,
-        errors=errors,
-        database_error=False,
-        has_filters=any(values.values()),
-    ), 400 if errors else 200
+    filter_query = {field: value for field, value in values.items() if value}
+    context.update(
+        total=total,
+        records=[{**display_row(row), "can_edit": can_edit(actor, row["user_id"])} for row in rows],
+        pager=None if pages == 1 else {
+            "page": page, "pages": pages,
+            "first": (page - 1) * PAGE_SIZE + 1, "last": min(page * PAGE_SIZE, total),
+            "previous": url_path(request.app, "records", **filter_query, page=page - 1) if page > 1 else None,
+            "next": url_path(request.app, "records", **filter_query, page=page + 1) if page < pages else None,
+        },
+    )
+    return render(request, "records.html", **context)

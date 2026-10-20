@@ -1,12 +1,20 @@
-"""Temporary image-upload demo for the user's Food-101 MobileNetV2 model."""
+"""Food image prediction page: name the dish in a photo with the Food-101 model."""
 
+import logging
 from pathlib import Path
 
 import numpy as np
-from flask import current_app, jsonify, render_template, url_for
+from fastapi import APIRouter, File, Request, UploadFile
 from PIL import ImageOps
+from pydantic import BaseModel
 
+from app.config import PROJECT_ROOT
 from app.vision.uploads import UploadError, read_uploaded_image
+from app.web import api_error, render, url_path
+
+
+logger = logging.getLogger(__name__)
+router = APIRouter(tags=["Food image prediction"])
 
 
 MODEL_FILENAME = "food101_mobilenetv2.keras"
@@ -21,25 +29,14 @@ if len(LABELS) != 101 or len(set(LABELS)) != 101:
     raise RuntimeError("Food-101 labels must contain 101 unique ordered names.")
 
 
-def _model_path():
-    return Path(
-        current_app.config.get(
-            "FOOD_CLASSIFIER_MODEL_PATH",
-            Path(current_app.root_path).parent / "ml_models" / MODEL_FILENAME,
-        )
-    )
-
-
-def _get_model():
-    """Load once per Flask app; tests may supply a model through config."""
-    model = current_app.config.get("FOOD_CLASSIFIER_MODEL")
-    if model is not None:
-        return model
-    model = current_app.extensions.get("food_classifier_model")
+def _get_model(app):
+    """Load once per app; tests may supply a model as settings["FOOD_CLASSIFIER_MODEL"]."""
+    settings = app.state.settings
+    model = settings.get("FOOD_CLASSIFIER_MODEL") or getattr(app.state, "food_classifier_model", None)
     if model is not None:
         return model
 
-    path = _model_path()
+    path = Path(settings.get("FOOD_CLASSIFIER_MODEL_PATH", PROJECT_ROOT / "ml_models" / MODEL_FILENAME))
     if not path.is_file():
         raise FileNotFoundError(f"Food classifier model is missing: {path}")
 
@@ -50,7 +47,7 @@ def _get_model():
         raise ValueError("Food classifier must accept 224 x 224 RGB images.")
     if model.output_shape[-1] != len(LABELS):
         raise ValueError("Food classifier output count does not match Food-101 labels.")
-    current_app.extensions["food_classifier_model"] = model
+    app.state.food_classifier_model = model
     return model
 
 
@@ -65,8 +62,8 @@ def _prepare_image(image):
     )
 
 
-def _predict(image):
-    scores = np.asarray(_get_model().predict(_prepare_image(image), verbose=0))[0]
+def _predict(app, image):
+    scores = np.asarray(_get_model(app).predict(_prepare_image(image), verbose=0))[0]
     if scores.shape != (len(LABELS),) or not np.all(np.isfinite(scores)):
         raise ValueError("Food classifier returned invalid predictions.")
     top = np.argsort(scores)[-3:][::-1]
@@ -77,33 +74,43 @@ def _predict(image):
     ]
 
 
-def food_prediction():
-    """``GET /food-prediction`` - the React image prediction page."""
-    return render_template(
-        "_react_page.html",
+class Prediction(BaseModel):
+    label: str
+    confidence: float
+
+
+class FoodPredictions(BaseModel):
+    predictions: list[Prediction]
+
+
+@router.get("/food-prediction", name="food_prediction", include_in_schema=False)
+def food_prediction(request: Request):
+    return render(
+        request, "_react_page.html",
         react_page="prediction",
         active_page="food_prediction",
         heading="Food image prediction",
         description=("Add a photo of one dish to see what the Food-101 model recognises. "
                      "Predictions are not saved as waste records."),
-        settings={"apiUrl": url_for("predict_food"), "classCount": len(LABELS)},
+        settings={"apiUrl": url_path(request.app, "predict_food"), "classCount": len(LABELS)},
     )
 
 
-def predict_food():
-    """``POST /api/food-predict`` - the three most likely Food-101 dishes."""
+@router.post("/api/food-predict", name="predict_food", response_model=FoodPredictions,
+             summary="Name the dish in a photo (top three Food-101 guesses)")
+def predict_food(request: Request, image: UploadFile | None = File(None)):
     try:
-        image = read_uploaded_image("Choose a food photo before predicting.")
-        predictions = _predict(image)
+        photo = read_uploaded_image(image, "Choose a food photo before predicting.")
+        predictions = _predict(request.app, photo)
     except UploadError as error:
-        return jsonify({"error": error.message}), error.status
+        return api_error(error.message, error.status)
     except (FileNotFoundError, ImportError):
-        current_app.logger.exception("Food classifier is unavailable")
-        return jsonify({"error": "The food model is unavailable. Check the server setup."}), 503
+        logger.exception("Food classifier is unavailable")
+        return api_error("The food model is unavailable. Check the server setup.", 503)
     except Exception:
-        current_app.logger.exception("Food classification failed")
-        return jsonify({"error": "Prediction failed. Check the server logs."}), 500
-    return jsonify({"predictions": [
-        {"label": item["label"], "confidence": round(item["confidence"], 1)}
+        logger.exception("Food classification failed")
+        return api_error("Prediction failed. Check the server logs.", 500)
+    return FoodPredictions(predictions=[
+        Prediction(label=item["label"], confidence=round(item["confidence"], 1))
         for item in predictions
-    ]})
+    ])

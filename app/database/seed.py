@@ -2,59 +2,63 @@
 
 from datetime import datetime, timedelta, timezone
 import secrets
-import sqlite3
 
-from werkzeug.security import generate_password_hash
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.database.queries import create_user, create_waste_record
+from app.database.tables import LOOKUP_TABLES, UserRow, WasteRecordRow
 
 
-def seed_demo_data(db: sqlite3.Connection) -> dict[str, str]:
-    if db.execute("SELECT COUNT(*) FROM users").fetchone()[0] or db.execute(
-        "SELECT COUNT(*) FROM waste_records"
-    ).fetchone()[0]:
+LOOKUP_NAMES = {
+    "areas": ["Main Kitchen", "Buffet", "Banquet"],
+    "categories": ["Vegetables", "Prepared Food", "Bakery", "Meat & Seafood"],
+    "reasons": ["Preparation Trimmings", "Spoilage", "Plate Returns", "Overproduction"],
+}
+DEMO_USERS = [
+    ("demo_entry", "Demo Kitchen Staff", "entry"),
+    ("demo_manager", "Demo Supervisor", "manager"),
+    ("demo_admin", "Demo Administrator", "admin"),
+]
+SAMPLES = [
+    (1, "Main Kitchen", "Vegetables", "Preparation Trimmings", 2.4, "Synthetic preparation waste"),
+    (2, "Buffet", "Prepared Food", "Overproduction", 5.1, "Synthetic buffet surplus"),
+    (3, "Banquet", "Bakery", "Plate Returns", 1.2, "Synthetic plate returns"),
+]
+
+
+def seed_demo_data(db: Session) -> dict[str, str]:
+    """Add demo lookups, users and three records. Returns one-time passwords."""
+    if db.scalar(select(func.count(UserRow.id))) or db.scalar(select(func.count(WasteRecordRow.id))):
         raise ValueError("Demo seed requires a database without users or waste records")
 
-    values = {
-        "areas": ["Main Kitchen", "Buffet", "Banquet"],
-        "categories": ["Vegetables", "Prepared Food", "Bakery", "Meat & Seafood"],
-        "reasons": ["Preparation Trimmings", "Spoilage", "Plate Returns", "Overproduction"],
-    }
+    ids = {}
+    for table, names in LOOKUP_NAMES.items():
+        model = LOOKUP_TABLES[table]
+        existing = {row.name: row.id for row in db.scalars(select(model))}
+        for name in names:
+            if name not in existing:
+                row = model(name=name, active=1)
+                db.add(row)
+                db.flush()
+                existing[name] = row.id
+        ids[table] = existing
+    db.commit()
+
     credentials = {}
-    with db:
-        for table, names in values.items():
-            for name in names:
-                db.execute(f"INSERT OR IGNORE INTO {table} (name) VALUES (?)", (name,))
+    users = {}
+    for username, name, role in DEMO_USERS:
+        credentials[username] = secrets.token_urlsafe(12)
+        users[username] = create_user(db, name=name, username=username,
+                                      password=credentials[username], role=role)
 
-        for username, name, role in [
-            ("demo_entry", "Demo Kitchen Staff", "entry"),
-            ("demo_manager", "Demo Supervisor", "manager"),
-            ("demo_admin", "Demo Administrator", "admin"),
-        ]:
-            password = secrets.token_urlsafe(12)
-            credentials[username] = password
-            db.execute(
-                "INSERT INTO users (name, username, password_hash, role) VALUES (?, ?, ?, ?)",
-                (name, username, generate_password_hash(password), role),
-            )
-
-        user_id = db.execute("SELECT id FROM users WHERE username = 'demo_entry'").fetchone()[0]
-        now = datetime.now(timezone.utc)
-        samples = [
-            (1, "Main Kitchen", "Vegetables", "Preparation Trimmings", 2.4, "Synthetic preparation waste"),
-            (2, "Buffet", "Prepared Food", "Overproduction", 5.1, "Synthetic buffet surplus"),
-            (3, "Banquet", "Bakery", "Plate Returns", 1.2, "Synthetic plate returns"),
-        ]
-        for days_ago, area, category, reason, quantity, notes in samples:
-            event_at = (now - timedelta(days=days_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
-            db.execute(
-                """INSERT INTO waste_records
-                   (event_at, area_id, category_id, reason_id, quantity_kg, user_id, notes)
-                   VALUES (
-                       ?,
-                       (SELECT id FROM areas WHERE name = ?),
-                       (SELECT id FROM categories WHERE name = ?),
-                       (SELECT id FROM reasons WHERE name = ?),
-                       ?, ?, ?
-                   )""",
-                (event_at, area, category, reason, quantity, user_id, notes),
-            )
+    now = datetime.now(timezone.utc)
+    for days_ago, area, category, reason, quantity, notes in SAMPLES:
+        create_waste_record(
+            db, event_at=(now - timedelta(days=days_ago)).replace(microsecond=0),
+            area_id=ids["areas"][area], category_id=ids["categories"][category],
+            reason_id=ids["reasons"][reason], quantity_kg=quantity,
+            user_id=users["demo_entry"].id, notes=notes,
+        )
     return credentials
+
