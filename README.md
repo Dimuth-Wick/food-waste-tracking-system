@@ -148,7 +148,9 @@ Three pages are React apps mounted inside the server-rendered layout. Their sour
 | Meal forecast | `frontend/src/forecast/` | `POST /api/predict-meal`, `GET /api/forecast-history` |
 | Food counting | `frontend/src/counting/` | `POST /api/food-count` |
 
-The **Waste overview** is a Jinja template rendered by FastAPI. It combines the filters, totals, breakdowns and the full record table on one page; **Add waste record** and **Edit** open as a side panel over it. Old `/records` links redirect to the overview, and `/records/new` opens the overview with the add panel showing, so kitchen staff can bookmark it. All pages share the colours and layout in `app/static/styles.css`: white sheets hold what people enter, and dark pine panels hold what the system answers.
+The **Waste overview** is a Jinja template rendered by FastAPI. It combines the filters, totals, breakdowns and the full record table on one page; **Add waste record** and **Edit** open as a side panel over it. Old `/records` links redirect to the overview, and `/records/new` opens the overview with the add panel showing, so kitchen staff can bookmark it. All pages share the colours and layout in `app/static/styles.css`: white sheets hold what people enter, and dark green panels hold what the system answers.
+
+**Daily waste chart.** The overview charts the last 30 days (`frontend/src/daily/`). Bars above zero are kilograms thrown away; bars below zero are days the food ran out. To record a shortage, add a record with the reason **Ran out (shortage)** and enter the kilograms that were missing. Shortages are kept out of the waste totals and breakdowns, and shown as negative amounts (blue) in the table. Waste and shortage are never netted into one number, because they would cancel each other out.
 
 The built files are committed in `app/static/react/`, so `python run.py` works without Node.js. To change the React code, install [Node.js](https://nodejs.org/), then:
 
@@ -166,7 +168,7 @@ Run tests with `.venv\Scripts\python.exe -m pip install -r requirements-dev.txt`
 
 ## 🗄️ Database
 
-The app uses SQLAlchemy, so it runs on the local SQLite file by default and on PostgreSQL by changing one setting. Large record lists are split into pages of 50, and the overview's totals are added up by the database.
+The app uses SQLAlchemy, so it runs on the local SQLite file by default and on PostgreSQL by changing one setting. The record table shows the 5 newest records with a "See more" button, and the overview's totals are added up by the database.
 
 | Setting | Default | Example |
 |---|---|---|

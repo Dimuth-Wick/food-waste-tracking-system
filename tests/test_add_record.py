@@ -18,7 +18,6 @@ def valid_form(app):
         return {
             "event_at": "2026-10-01T12:30",
             "area_id": str(scalar(db, "SELECT id FROM areas WHERE name = 'Buffet'")),
-            "category_id": str(scalar(db, "SELECT id FROM categories WHERE name = 'Vegetables'")),
             "reason_id": str(scalar(db, "SELECT id FROM reasons WHERE name = 'Spoilage'")),
             "quantity_kg": "2.75",
         }
@@ -82,11 +81,11 @@ def test_invalid_entries_show_field_errors_in_the_panel_and_save_nothing(app_wit
     assert "Enter the quantity in kilograms" in missing.text
 
     bad_form = valid_form(app)
-    bad_form.update(event_at="invalid", category_id="9999", quantity_kg="-2")
+    bad_form.update(event_at="invalid", reason_id="9999", quantity_kg="-2")
     invalid = browser.post("/records/new", data=bad_form)
     assert invalid.status_code == 400
     assert "valid local date and time" in invalid.text
-    assert "valid food category" in invalid.text
+    assert "valid reason for waste" in invalid.text
     assert "greater than zero" in invalid.text
     assert 'aria-invalid="true"' in invalid.text
     assert 'value="-2"' in invalid.text                      # what was typed is kept
@@ -97,11 +96,11 @@ def test_invalid_entries_show_field_errors_in_the_panel_and_save_nothing(app_wit
 
     inactive_form = valid_form(app)
     with database(app) as db:
-        sql(db, "UPDATE categories SET active = 0 WHERE id = :id", id=int(inactive_form["category_id"]))
+        sql(db, "UPDATE reasons SET active = 0 WHERE id = :id", id=int(inactive_form["reason_id"]))
         db.commit()
     inactive = browser.post("/records/new", data=inactive_form)
     assert inactive.status_code == 400
-    assert "Select a valid food category" in inactive.text
+    assert "Select a valid reason for waste" in inactive.text
 
     with database(app) as db:
         assert scalar(db, "SELECT COUNT(*) FROM waste_records") == initial_count

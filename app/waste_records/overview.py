@@ -19,6 +19,7 @@ from app.database.queries import (
     count_waste_records,
     get_user_by_username,
     get_waste_record,
+    list_daily_amounts,
     list_waste_records,
     total_waste_kg,
     waste_by,
@@ -32,6 +33,7 @@ from app.waste_records.common import (
     can_edit,
     display_row,
     load_lookups,
+    local_time,
     parse_filters,
     parse_id,
     utc_boundary,
@@ -72,10 +74,28 @@ def build_summary(db: Session, filters: RecordFilters, today: date) -> dict:
         "week_kg": total_waste_kg(db, _within(filters, today - timedelta(days=today.weekday()), today)),
         "month_kg": total_waste_kg(db, _within(filters, today.replace(day=1), today)),
         "area_breakdown": _breakdown(waste_by(db, "areas", filters)),
-        "category_breakdown": _breakdown(waste_by(db, "categories", filters)),
         "reason_breakdown": _breakdown(waste_by(db, "reasons", filters)),
         "record_count": count_waste_records(db, filters),
     }
+
+
+DAILY_DAYS = 30
+
+
+def build_daily(db: Session, filters: RecordFilters, today: date) -> list[dict]:
+    """Waste and shortage per Sri Lanka calendar day for the last 30 days, oldest first.
+
+    Follows the area and reason filters, but not the date filters: it is always the last 30 days.
+    """
+    first = today - timedelta(days=DAILY_DAYS - 1)
+    window = _within(replace(filters, start_at_utc=None, end_before_utc=None), first, today)
+    days = {first + timedelta(days=i): {"waste": 0.0, "short": 0.0} for i in range(DAILY_DAYS)}
+    for event_at, kg, is_short in list_daily_amounts(db, window):
+        day = local_time(event_at).date()
+        if day in days:
+            days[day]["short" if is_short else "waste"] += kg
+    return [{"date": day.isoformat(), "waste": round(v["waste"], 2), "short": round(v["short"], 2)}
+            for day, v in days.items()]
 
 
 def view_state(request: Request) -> dict[str, str]:
@@ -104,8 +124,8 @@ def render_overview(request: Request, db: Session, *, panel=None, status_code=20
     values = {field: state.get(field, "") for field in FILTER_FIELDS}
     context = {
         "active_page": "dashboard", "values": values, "has_filters": bool(filters_only),
-        "errors": {}, "database_error": False, "areas": [], "categories": [], "reasons": [],
-        "summary": None, "records": [], "more": None, "notice": None, "panel": panel,
+        "errors": {}, "database_error": False, "areas": [], "reasons": [],
+        "summary": None, "daily": None, "records": [], "more": None, "notice": None, "panel": panel,
         "moderate_kg": MODERATE_KG, "heavy_kg": HEAVY_KG,
         "add_url": url_path(request.app, "new_record", **state),
         "clear_filters_url": url_path(request.app, "dashboard"),
@@ -119,6 +139,7 @@ def render_overview(request: Request, db: Session, *, panel=None, status_code=20
             return render(request, "overview.html", 400 if status_code == 200 else status_code, **context)
 
         context["summary"] = summary = build_summary(db, filters, _now_local().date())
+        context["daily"] = build_daily(db, filters, _now_local().date())
         total = summary["record_count"]
         shown = _rows_shown(state.get("show", ""))
         actor = get_user_by_username(db, DEMO_USERNAME)

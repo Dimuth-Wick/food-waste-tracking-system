@@ -64,7 +64,6 @@ def test_overview_uses_stored_rows_and_local_calendar_boundaries(overview_app):
     assert "7 records" in html
     assert "Kitchen: 16.00 kilograms" in html
     assert "Buffet: 12.00 kilograms" in html
-    assert "Bakery: 13.00 kilograms" in html
     assert "Spoilage: 15.00 kilograms" in html
     # Only the newest five are listed to begin with; the rest sit behind "See more".
     assert all(f"FW-{number:03d}" in html for number in range(3, 8)) and "FW-002" not in html
@@ -79,7 +78,7 @@ def test_one_set_of_filters_drives_totals_and_records(overview_app):
     other = add_record(app, user_id, ids, "2026-10-02T00:00", 5, "Buffet", "Vegetables", "Spoilage")
     browser = client(app)
     query = (f"start_date=2026-10-01&end_date=2026-10-01&area_id={ids['areas']['Buffet']}"
-             f"&category_id={ids['categories']['Bakery']}&reason_id={ids['reasons']['Overproduction']}")
+             f"&reason_id={ids['reasons']['Overproduction']}")
     page = browser.get(f"/?{query}").text
     assert "4.00" in page
     assert "1 record matching filters" in page
@@ -102,9 +101,10 @@ def test_one_set_of_filters_drives_totals_and_records(overview_app):
     assert "No matching records" in no_match.text
     assert "No records match these filters" in no_match.text
 
-    bad_category = browser.get("/?category_id=999")
-    assert bad_category.status_code == 400
-    assert "Select a valid category" in bad_category.text
+    bad_reason = browser.get("/?reason_id=999")
+    assert bad_reason.status_code == 400
+    assert "Select a valid reason" in bad_reason.text
+    assert "category" not in browser.get("/").text.lower()   # records are whole-waste, no food category
 
 
 def test_record_row_shows_local_time_user_and_edit_link(overview_app):
@@ -117,7 +117,7 @@ def test_record_row_shows_local_time_user_and_edit_link(overview_app):
             category_id=ids["categories"]["Vegetables"], reason_id=ids["reasons"]["Spoilage"],
             quantity_kg=1.25, user_id=demo.id)
     page = client(app).get("/").text
-    for expected in ("FW-001", "01 Oct 2026", "00:30", "Kitchen", "Vegetables", "Spoilage",
+    for expected in ("FW-001", "01 Oct 2026", "00:30", "Kitchen", "Spoilage",
                      "Demo Kitchen Staff", "1.25 kg", f"/records/{record.id}/edit"):
         assert expected in page
 
@@ -156,3 +156,35 @@ def test_weights_are_banded_green_amber_red():
 
     assert [weight_band(kg) for kg in (0.5, 1.99, 2, 4.99, 5, 12)] == [
         "light", "light", "moderate", "moderate", "heavy", "heavy"]
+
+
+def test_shortages_stay_out_of_waste_totals_and_go_below_zero_on_the_daily_chart(overview_app):
+    from datetime import date
+
+    from app.database.queries import RecordFilters
+    from app.waste_records.common import weight_band
+    from app.waste_records.overview import build_daily
+
+    app, user_id, ids = overview_app
+    with database(app) as db:
+        sql(db, "INSERT INTO reasons (name, active) VALUES ('Ran out (shortage)', 1)")
+        db.commit()
+        short_id = scalar(db, "SELECT id FROM reasons WHERE name = 'Ran out (shortage)'")
+    add_record(app, user_id, ids, "2026-10-01T10:00", 4)
+    add_record(app, user_id, ids, "2026-10-02T09:00", 2)
+    with database(app) as db:
+        create_waste_record(db, event_at=datetime(2026, 10, 1, 20, 0, tzinfo=DEMO_TIMEZONE),
+                            area_id=ids["areas"]["Kitchen"], category_id=ids["categories"]["Vegetables"],
+                            reason_id=short_id, quantity_kg=3, user_id=user_id)
+        days = build_daily(db, RecordFilters(), date(2026, 10, 2))
+
+    assert len(days) == 30 and days[0]["date"] == "2026-09-03" and days[-1]["date"] == "2026-10-02"
+    assert days[-2] == {"date": "2026-10-01", "waste": 4.0, "short": 3.0}
+    assert days[-1] == {"date": "2026-10-02", "waste": 2.0, "short": 0.0}
+    assert sum(d["waste"] for d in days) == 6.0
+
+    page = client(app).get("/").text
+    assert "6.00" in page and "9.00" not in page           # the 3 kg shortage is not waste
+    assert "Waste each day, last 30 days" in page and 'id="daily-waste-root"' in page
+    assert "\u22123 kg" in page and "weight-short" in page   # shown as a negative amount in the table
+    assert weight_band(3, "Ran out (shortage)") == "short"

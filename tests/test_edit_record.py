@@ -20,7 +20,6 @@ def form_for(app, *, quantity="3.5"):
         return {
             "event_at": "2026-10-02T15:45",
             "area_id": str(scalar(db, "SELECT id FROM areas WHERE name = 'Buffet'")),
-            "category_id": str(scalar(db, "SELECT id FROM categories WHERE name = 'Vegetables'")),
             "reason_id": str(scalar(db, "SELECT id FROM reasons WHERE name = 'Spoilage'")),
             "quantity_kg": quantity,
         }
@@ -68,11 +67,11 @@ def test_invalid_edit_does_not_change_record(app_with_demo):
                                "(SELECT id FROM users WHERE username = 'demo_entry') LIMIT 1")
         before = get_waste_record(db, record_id)
     invalid = form_for(app, quantity="-1")
-    invalid["category_id"] = "99999"
+    invalid["reason_id"] = "99999"
     response = client(app).post(f"/records/{record_id}/edit", data=invalid)
     assert response.status_code == 400
     assert "greater than zero" in response.text
-    assert "valid food category" in response.text
+    assert "valid reason for waste" in response.text
     assert '<dialog class="record-panel"' in response.text
     with database(app) as db:
         assert get_waste_record(db, record_id) == before

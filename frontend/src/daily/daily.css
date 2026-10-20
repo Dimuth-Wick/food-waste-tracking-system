@@ -1,0 +1,31 @@
+/* Daily waste chart on the overview: bars above zero are waste, bars below zero are shortages. */
+.dw-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 0 0 18px; }
+.dw-stats > div { padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--linen); }
+.dw-stats dt { font-size: .85rem; font-weight: 700; color: var(--muted); }
+.dw-stats dd { margin: 2px 0 0; font-size: 1.15rem; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.dw-stats .has-short { border-color: #bcd5ee; background: #eef5fc; }
+.dw-stats .has-short dd { color: #17568f; }
+
+.dw-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 24px; margin-bottom: 8px; }
+.dw-legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: .85rem; color: var(--muted); }
+.dw-legend span, .dw-detail span { display: inline-flex; align-items: center; gap: 7px; }
+.dw-legend i, .dw-detail i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.dw-detail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; min-height: 40px; margin: 0; padding: 6px 14px; border: 1px dashed var(--line); border-radius: 12px; font-size: .88rem; color: var(--muted); }
+.dw-detail:has(strong) { border-style: solid; background: var(--sheet); color: var(--text); }
+.dw-detail strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.dw-scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; }
+.dw-plot { position: relative; border-radius: 6px; }
+.dw-plot:focus-visible { outline-offset: 4px; }
+.dw-svg { display: block; overflow: visible; }
+.dw-grid { stroke: #e4efe8; stroke-dasharray: 2 4; }
+.dw-zero { stroke: #557064; stroke-width: 1.5; }
+.dw-tick { fill: #557064; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.dw-tick.is-zero { fill: var(--ink); font-weight: 700; }
+.dw-month { fill: var(--ink); font-size: 12px; font-weight: 700; }
+.dw-day.is-active .dw-tick { fill: var(--ink); font-weight: 800; }
+.dw-column { fill: var(--mist); opacity: .7; pointer-events: none; }
+.dw-average { stroke: #557064; stroke-width: 1.5; stroke-dasharray: 5 4; }
+.dw-average-label { fill: #3f5a4e; font-size: 12px; font-weight: 700; }
+.dw-table { margin-top: 12px; }
+.dw-table summary { cursor: pointer; color: var(--leaf-dark); font-weight: 700; }

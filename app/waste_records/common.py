@@ -5,14 +5,14 @@ import re
 
 from sqlalchemy.orm import Session
 
-from app.database.queries import MAX_ID, RecordFilters, list_lookup_items
+from app.database.queries import MAX_ID, SHORTAGE_REASON, RecordFilters, list_lookup_items
 
 
 # The demo hotel is in Sri Lanka; dates on screen use Sri Lanka local time.
 DEMO_TIMEZONE = timezone(timedelta(hours=5, minutes=30))
 DEMO_USERNAME = "demo_entry"
-LOOKUPS = ("areas", "categories", "reasons")
-FILTER_FIELDS = ("start_date", "end_date", "area_id", "category_id", "reason_id")
+LOOKUPS = ("areas", "reasons")
+FILTER_FIELDS = ("start_date", "end_date", "area_id", "reason_id")
 
 
 def parse_id(raw: str) -> int | None:
@@ -65,8 +65,7 @@ def parse_filters(values: dict[str, str], lookups) -> tuple[dict[str, str], Reco
         errors["end_date"] = "To date must be on or after From date."
 
     ids = {}
-    for field, label, table in (("area_id", "area", "areas"), ("category_id", "category", "categories"),
-                                ("reason_id", "reason", "reasons")):
+    for field, label, table in (("area_id", "area", "areas"), ("reason_id", "reason", "reasons")):
         raw = values[field]
         if raw:
             if (parsed := parse_id(raw)) not in {item.id for item in lookups[table]}:
@@ -87,8 +86,10 @@ MODERATE_KG = 2
 HEAVY_KG = 5
 
 
-def weight_band(quantity_kg: float) -> str:
-    """"light", "moderate" or "heavy", so heavy waste stands out at a glance."""
+def weight_band(quantity_kg: float, reason: str | None = None) -> str:
+    """"light", "moderate" or "heavy" so heavy waste stands out; "short" when food ran out."""
+    if reason == SHORTAGE_REASON:
+        return "short"
     return "heavy" if quantity_kg >= HEAVY_KG else "moderate" if quantity_kg >= MODERATE_KG else "light"
 
 
@@ -96,4 +97,4 @@ def display_row(row: dict) -> dict:
     """Add Sri Lanka date and time strings to a record row for templates."""
     moment = local_time(row["event_at"])
     return {**row, "date": moment.strftime("%d %b %Y"), "time": moment.strftime("%H:%M"),
-            "band": weight_band(row["quantity_kg"])}
+            "band": weight_band(row["quantity_kg"], row.get("reason"))}

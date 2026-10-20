@@ -7,7 +7,7 @@
   <div class="record-panel-header">
     <div>
       <h2 id="record-panel-title">{{ 'Edit' if panel.editing else 'Add' }} waste record{% if panel.editing %} FW-{{ "%03d"|format(panel.record_id) }}{% endif %}</h2>
-      <p>{{ 'Correct the saved details. The change is saved to the same record.' if panel.editing else 'Record what was thrown away, where it happened, and why.' }}</p>
+      <p>{{ 'Correct the saved details. The change is saved to the same record.' if panel.editing else 'Record the total waste for a service: when it happened, where, why, and how many kilograms.' }}</p>
     </div>
     <a class="record-panel-close" href="{{ panel.close_url }}" aria-label="Close without saving">×</a>
   </div>
@@ -26,7 +26,6 @@
     </div>
     {% for field, id, label, placeholder, items in [
       ('area_id', 'area', 'Source area', 'Select an area', panel.areas),
-      ('category_id', 'category', 'Food category', 'Select a category', panel.categories),
       ('reason_id', 'reason', 'Reason for waste', 'Select a reason', panel.reasons)] %}
     <div class="form-field">
       <label for="{{ id }}">{{ label }} <span aria-hidden="true">*</span></label>
@@ -40,12 +39,12 @@
     <div class="form-field">
       <label for="quantity">Quantity <span aria-hidden="true">*</span></label>
       <div class="input-unit input-quantity"><input id="quantity" name="quantity_kg" type="number" min="0" step="any" placeholder="0.000" value="{{ values.get('quantity_kg', '') }}" required {% if errors.get('quantity_kg') %}aria-invalid="true" aria-describedby="quantity-error"{% endif %}><span>kg</span></div>
-      {% if errors.get('quantity_kg') %}<small class="field-error" id="quantity-error">{{ errors.quantity_kg }}</small>{% else %}<small>Enter a weight greater than zero.</small>{% endif %}
+      {% if errors.get('quantity_kg') %}<small class="field-error" id="quantity-error">{{ errors.quantity_kg }}</small>{% else %}<small>Enter a weight greater than zero. If the food ran out, choose “Ran out (shortage)” as the reason and enter the kilograms that were missing.</small>{% endif %}
     </div>
     <p class="form-attribution">{{ 'Editing as' if panel.editing else 'Responsible user' }}: <strong>{{ panel.actor_name or 'Unavailable' }}</strong>. Date and time use Sri Lanka local time.</p>
     <div class="form-actions">
       <a class="button button-secondary" href="{{ panel.close_url }}">Cancel</a>
-      <button class="button button-primary" type="submit" {% if not panel.actor_name or not panel.areas or not panel.categories or not panel.reasons %}disabled{% endif %}>{{ 'Save changes' if panel.editing else 'Save record' }}</button>
+      <button class="button button-primary" type="submit" {% if not panel.actor_name or not panel.areas or not panel.reasons %}disabled{% endif %}>{{ 'Save changes' if panel.editing else 'Save record' }}</button>
     </div>
   </form>
 </dialog>

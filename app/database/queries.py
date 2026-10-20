@@ -23,6 +23,12 @@ from app.database.tables import (
 
 
 ROLES = {"entry", "manager", "admin"}
+# Records describe the whole waste of a service, not one food type. The database column for a
+# category stays (older databases require it), so every record points at this one placeholder.
+WHOLE_WASTE_CATEGORY = "Whole waste"
+# A record with this reason means food ran out (kilograms we were short), not food thrown away.
+# It is kept out of the waste totals and shown below zero on the daily chart.
+SHORTAGE_REASON = "Ran out (shortage)"
 MAX_ID = 2**63 - 1
 
 
@@ -63,7 +69,6 @@ class RecordFilters:
     start_at_utc: str | None = None
     end_before_utc: str | None = None
     area_id: int | None = None
-    category_id: int | None = None
     reason_id: int | None = None
 
 
@@ -145,9 +150,22 @@ def _checked_time(event_at: datetime) -> str:
     return utc_text(event_at)
 
 
-def create_waste_record(db: Session, *, event_at: datetime, area_id: int, category_id: int,
-                        reason_id: int, quantity_kg: float, user_id: int,
+def whole_waste_category_id(db: Session) -> int:
+    """The id of the single "Whole waste" category, created the first time it is needed."""
+    found = db.scalar(select(CategoryRow.id).where(CategoryRow.name == WHOLE_WASTE_CATEGORY))
+    if found is not None:
+        return found
+    row = CategoryRow(name=WHOLE_WASTE_CATEGORY, active=1)
+    db.add(row)
+    _commit(db)
+    return row.id
+
+
+def create_waste_record(db: Session, *, event_at: datetime, area_id: int, reason_id: int,
+                        quantity_kg: float, user_id: int, category_id: int | None = None,
                         notes: str = "") -> WasteRecord:
+    if category_id is None:
+        category_id = whole_waste_category_id(db)
     now = _now_text()
     row = WasteRecordRow(
         event_at=_checked_time(event_at), area_id=area_id, category_id=category_id,
@@ -167,14 +185,13 @@ def get_waste_record(db: Session, record_id: int) -> WasteRecord | None:
 
 
 def update_waste_record(db: Session, record_id: int, *, event_at: datetime, area_id: int,
-                        category_id: int, reason_id: int,
-                        quantity_kg: float) -> WasteRecord | None:
+                        reason_id: int, quantity_kg: float) -> WasteRecord | None:
     event_text = _checked_time(event_at)
     quantity = _checked_quantity(quantity_kg)
     row = db.get(WasteRecordRow, record_id) if 0 < record_id <= MAX_ID else None
     if row is None:
         return None
-    row.event_at, row.area_id, row.category_id = event_text, area_id, category_id
+    row.event_at, row.area_id = event_text, area_id
     row.reason_id, row.quantity_kg, row.updated_at = reason_id, quantity, _now_text()
     _commit(db)
     return _record(row)
@@ -187,7 +204,6 @@ def _where(statement, filters: RecordFilters):
     if filters.end_before_utc is not None:
         statement = statement.where(record.event_at < filters.end_before_utc)
     for column, value in ((record.area_id, filters.area_id),
-                          (record.category_id, filters.category_id),
                           (record.reason_id, filters.reason_id)):
         if value is not None:
             statement = statement.where(column == value)
@@ -200,10 +216,9 @@ def list_waste_records(db: Session, filters: RecordFilters = RecordFilters(), *,
     statement = _where(
         select(WasteRecordRow.id, WasteRecordRow.event_at, WasteRecordRow.quantity_kg,
                WasteRecordRow.user_id, AreaRow.name.label("area"),
-               CategoryRow.name.label("category"), ReasonRow.name.label("reason"),
+               ReasonRow.name.label("reason"),
                UserRow.name.label("recorded_by"))
         .join(AreaRow, AreaRow.id == WasteRecordRow.area_id)
-        .join(CategoryRow, CategoryRow.id == WasteRecordRow.category_id)
         .join(ReasonRow, ReasonRow.id == WasteRecordRow.reason_id)
         .join(UserRow, UserRow.id == WasteRecordRow.user_id),
         filters,
@@ -217,19 +232,32 @@ def count_waste_records(db: Session, filters: RecordFilters = RecordFilters()) -
     return db.scalar(_where(select(func.count(WasteRecordRow.id)), filters)) or 0
 
 
+def _waste_only(statement):
+    """Leave out shortage records, which are not waste."""
+    shortage = select(ReasonRow.id).where(ReasonRow.name == SHORTAGE_REASON)
+    return statement.where(WasteRecordRow.reason_id.not_in(shortage))
+
+
 def total_waste_kg(db: Session, filters: RecordFilters = RecordFilters()) -> float:
-    """Sum of quantity_kg, added up by the database rather than in Python."""
-    return float(db.scalar(_where(select(func.coalesce(func.sum(WasteRecordRow.quantity_kg), 0.0)),
-                                  filters)) or 0.0)
+    """Kilograms thrown away (shortages excluded), added up by the database rather than in Python."""
+    return float(db.scalar(_waste_only(_where(
+        select(func.coalesce(func.sum(WasteRecordRow.quantity_kg), 0.0)), filters))) or 0.0)
+
+
+def list_daily_amounts(db: Session, filters: RecordFilters = RecordFilters()) -> list[tuple[str, float, bool]]:
+    """(event_at, kg, is_shortage) for every matching record, for the daily chart."""
+    statement = _where(
+        select(WasteRecordRow.event_at, WasteRecordRow.quantity_kg, ReasonRow.name)
+        .join(ReasonRow, ReasonRow.id == WasteRecordRow.reason_id), filters)
+    return [(at, float(kg), name == SHORTAGE_REASON) for at, kg, name in db.execute(statement)]
 
 
 def waste_by(db: Session, table: str, filters: RecordFilters = RecordFilters()) -> list[tuple[str, float]]:
-    """(name, total kg) per area, category or reason, largest first."""
+    """(name, total kg) per area or reason, largest first."""
     model = LOOKUP_TABLES[table]
-    column = {"areas": WasteRecordRow.area_id, "categories": WasteRecordRow.category_id,
-              "reasons": WasteRecordRow.reason_id}[table]
+    column = {"areas": WasteRecordRow.area_id, "reasons": WasteRecordRow.reason_id}[table]
     total = func.sum(WasteRecordRow.quantity_kg).label("total")
-    statement = _where(select(model.name, total).join(model, model.id == column), filters)
+    statement = _waste_only(_where(select(model.name, total).join(model, model.id == column), filters))
     rows = db.execute(statement.group_by(model.name).order_by(total.desc(), model.name))
     return [(name, float(kg)) for name, kg in rows]
 

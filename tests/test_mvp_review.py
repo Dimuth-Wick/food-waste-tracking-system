@@ -15,7 +15,7 @@ def _prepare_database(app):
 
 
 def _form(quantity="2.5"):
-    return {"event_at": "2026-10-02T12:30", "area_id": "1", "category_id": "1",
+    return {"event_at": "2026-10-02T12:30", "area_id": "1",
             "reason_id": "1", "quantity_kg": quantity}
 
 
@@ -77,9 +77,9 @@ def test_oversized_identifiers_return_validation_errors(tmp_path):
     assert response.status_code == 400
     assert "Select a valid source area" in response.text
 
-    filtered = browser.get("/?category_id=" + too_long)
+    filtered = browser.get("/?area_id=" + too_long)
     assert filtered.status_code == 400
-    assert "Select a valid category" in filtered.text
+    assert "Select a valid area" in filtered.text
 
     overview = browser.get("/?reason_id=" + too_long)
     assert overview.status_code == 400

@@ -12,8 +12,7 @@ from app.database.tables import LOOKUP_TABLES, UserRow, WasteRecordRow
 
 LOOKUP_NAMES = {
     "areas": ["Main Kitchen", "Buffet", "Banquet"],
-    "categories": ["Vegetables", "Prepared Food", "Bakery", "Meat & Seafood"],
-    "reasons": ["Preparation Trimmings", "Spoilage", "Plate Returns", "Overproduction"],
+    "reasons": ["Preparation Trimmings", "Spoilage", "Plate Returns", "Overproduction", "Ran out (shortage)"],
 }
 DEMO_USERS = [
     ("demo_entry", "Demo Kitchen Staff", "entry"),
@@ -21,9 +20,9 @@ DEMO_USERS = [
     ("demo_admin", "Demo Administrator", "admin"),
 ]
 SAMPLES = [
-    (1, "Main Kitchen", "Vegetables", "Preparation Trimmings", 2.4, "Synthetic preparation waste"),
-    (2, "Buffet", "Prepared Food", "Overproduction", 5.1, "Synthetic buffet surplus"),
-    (3, "Banquet", "Bakery", "Plate Returns", 1.2, "Synthetic plate returns"),
+    (1, "Main Kitchen", "Preparation Trimmings", 2.4, "Synthetic preparation waste"),
+    (2, "Buffet", "Overproduction", 5.1, "Synthetic buffet surplus"),
+    (3, "Banquet", "Plate Returns", 1.2, "Synthetic plate returns"),
 ]
 
 
@@ -53,10 +52,10 @@ def seed_demo_data(db: Session) -> dict[str, str]:
                                       password=credentials[username], role=role)
 
     now = datetime.now(timezone.utc)
-    for days_ago, area, category, reason, quantity, notes in SAMPLES:
+    for days_ago, area, reason, quantity, notes in SAMPLES:
         create_waste_record(
             db, event_at=(now - timedelta(days=days_ago)).replace(microsecond=0),
-            area_id=ids["areas"][area], category_id=ids["categories"][category],
+            area_id=ids["areas"][area],
             reason_id=ids["reasons"][reason], quantity_kg=quantity,
             user_id=users["demo_entry"].id, notes=notes,
         )

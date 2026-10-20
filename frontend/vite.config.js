@@ -18,6 +18,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         counting: source("./src/counting/main.jsx"),
+        daily: source("./src/daily/main.jsx"),
         forecast: source("./src/forecast/main.jsx"),
       },
       output: {

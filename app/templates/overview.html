@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{% if panel %}{{ 'Edit' if panel.editing else 'Add' }} waste record{% else %}Waste overview{% endif %}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='react/react.css') }}">{% endblock %}
 {% block content %}
 <section class="page-heading">
   <div>
@@ -44,13 +45,24 @@
 </section>
 
 {% if summary.record_count %}
+<section class="sheet" aria-labelledby="daily-title">
+  <div class="sheet-heading">
+    <h2 id="daily-title">Waste each day, last 30 days</h2>
+    <span class="sheet-note">Follows the area and reason filters</span>
+  </div>
+  <div id="daily-waste-root" class="daily-waste-root" data-settings="{{ {'days': daily}|tojson|forceescape }}">
+    <noscript><p class="empty-note">This chart needs JavaScript. The records below show the same figures.</p></noscript>
+  </div>
+</section>
+<script type="module" src="{{ url_for('static', filename='react/daily.js') }}"></script>
+
 <section class="sheet" aria-labelledby="breakdown-title">
   <div class="sheet-heading">
     <h2 id="breakdown-title">Where the waste comes from</h2>
     <span class="sheet-note">Largest source highlighted</span>
   </div>
   <div class="breakdown-columns">
-    {% for title, items in [('area', summary.area_breakdown), ('category', summary.category_breakdown), ('reason', summary.reason_breakdown)] %}
+    {% for title, items in [('area', summary.area_breakdown), ('reason', summary.reason_breakdown)] %}
     <section class="breakdown" aria-labelledby="{{ title }}-title">
       <h3 id="{{ title }}-title">By {{ title }}</h3>
       <div class="bar-list">
@@ -78,11 +90,12 @@
     <li><span class="weight weight-light">Light</span> under {{ moderate_kg }} kg</li>
     <li><span class="weight weight-moderate">Moderate</span> {{ moderate_kg }} to {{ heavy_kg }} kg</li>
     <li><span class="weight weight-heavy">Heavy</span> {{ heavy_kg }} kg or more</li>
+    <li><span class="weight weight-short">Ran out</span> food was short</li>
   </ul>
   <div class="table-scroll">
     <table>
       <thead>
-        <tr><th scope="col">Record</th><th scope="col">Date and time <small>(Sri Lanka)</small></th><th scope="col">Area</th><th scope="col">Food category</th><th scope="col">Reason</th><th scope="col">Recorded by</th><th scope="col" class="numeric">Quantity</th><th scope="col"><span class="visually-hidden">Action</span></th></tr>
+        <tr><th scope="col">Record</th><th scope="col">Date and time <small>(Sri Lanka)</small></th><th scope="col">Area</th><th scope="col">Reason</th><th scope="col">Recorded by</th><th scope="col" class="numeric">Quantity</th><th scope="col"><span class="visually-hidden">Action</span></th></tr>
       </thead>
       <tbody>
         {% for record in records %}
@@ -90,10 +103,9 @@
           <td class="record-id"><span class="ticket">FW-{{ "%03d"|format(record.id) }}</span></td>
           <td><strong class="cell-primary">{{ record.date }}</strong><span class="cell-secondary">{{ record.time }}</span></td>
           <td>{{ record.area }}</td>
-          <td>{{ record.category }}</td>
           <td>{{ record.reason }}</td>
           <td>{{ record.recorded_by }}</td>
-          <td class="numeric amount"><span class="weight weight-{{ record.band }}" title="{{ record.band|capitalize }} waste">{{ "%g"|format(record.quantity_kg) }} kg<span class="visually-hidden"> ({{ record.band }})</span></span></td>
+          <td class="numeric amount"><span class="weight weight-{{ record.band }}" title="{{ 'Ran out of food' if record.band == 'short' else record.band|capitalize ~ ' waste' }}">{% if record.band == 'short' %}−{% endif %}{{ "%g"|format(record.quantity_kg) }} kg<span class="visually-hidden"> ({{ 'ran out' if record.band == 'short' else record.band }})</span></span></td>
           <td class="numeric">{% if record.can_edit %}<a class="text-link" href="{{ record.edit_url }}" aria-label="Edit record FW-{{ '%03d'|format(record.id) }}">Edit</a>{% endif %}</td>
         </tr>
         {% endfor %}

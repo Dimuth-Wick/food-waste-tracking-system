@@ -59,14 +59,20 @@ def generate_demo_data():
     deleted_count = cursor.rowcount
     print(f"Cleared {deleted_count} old demo records.")
 
-    # We need valid area_id, category_id, reason_id, user_id from the DB
+    # Records need valid areas, reasons and a user; each demo record picks its own area and reason.
     try:
-        area_id = cursor.execute("SELECT id FROM areas LIMIT 1").fetchone()[0]
-        category_id = cursor.execute("SELECT id FROM categories LIMIT 1").fetchone()[0]
-        reason_id = cursor.execute("SELECT id FROM reasons LIMIT 1").fetchone()[0]
+        area_ids = [row[0] for row in cursor.execute("SELECT id FROM areas WHERE active = 1")]
+        shortage = cursor.execute("SELECT id FROM reasons WHERE name = 'Ran out (shortage)'").fetchone()
+        shortage_id = shortage[0] if shortage else cursor.execute("INSERT INTO reasons (name, active) VALUES ('Ran out (shortage)', 1)").lastrowid
+        reason_ids = [row[0] for row in cursor.execute("SELECT id FROM reasons WHERE active = 1 AND id != ?", (shortage_id,))]
         user_id = cursor.execute("SELECT id FROM users LIMIT 1").fetchone()[0]
-    except Exception as e:
-        print("Error: Required foreign keys (area, category, reason, user) not found. Have you seeded the database?")
+        # Records no longer carry a food category; the old column points at one placeholder.
+        row = cursor.execute("SELECT id FROM categories WHERE name = 'Whole waste'").fetchone()
+        category_id = row[0] if row else cursor.execute("INSERT INTO categories (name, active) VALUES ('Whole waste', 1)").lastrowid
+        if not area_ids or not reason_ids:
+            raise ValueError("no areas or reasons")
+    except Exception:
+        print("Error: Required areas, reasons and a user not found. Have you seeded the database?")
         return
 
     base_date = datetime.date.today() - datetime.timedelta(days=DAYS)
@@ -98,8 +104,12 @@ def generate_demo_data():
             }
             notes_json = json.dumps(notes_payload)
             
-            # quantity_kg here represents waste, which the forecast API ignores, so we just set 1.0
-            waste_qty = 1.0
+            # Waste for this service: varied weights so the table shows light, moderate and heavy days.
+            waste_qty = round(random.choice([random.uniform(0.4, 1.9), random.uniform(0.6, 4.8), random.uniform(2.0, 8.5)]), 2)
+            area_id = random.choice(area_ids)
+            reason_id = random.choice(reason_ids)
+            if random.random() < 0.12:   # now and then the food ran out: kilograms we were short
+                reason_id, waste_qty = shortage_id, round(random.uniform(1.0, 6.0), 2)
             
             cursor.execute(
                 """

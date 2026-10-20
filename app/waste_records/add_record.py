@@ -23,17 +23,16 @@ from app.web import url_path
 
 logger = logging.getLogger(__name__)
 router = APIRouter(include_in_schema=False)
-FIELD_NAMES = ("event_at", "area_id", "category_id", "reason_id", "quantity_kg")
+FIELD_NAMES = ("event_at", "area_id", "reason_id", "quantity_kg")
 
 
 class RecordForm:
-    """The five form fields, as submitted text. Validation happens in parse_form."""
+    """The four form fields, as submitted text. Validation happens in parse_form."""
 
     def __init__(self, event_at: str = Form(""), area_id: str = Form(""),
-                 category_id: str = Form(""), reason_id: str = Form(""),
-                 quantity_kg: str = Form("")):
+                 reason_id: str = Form(""), quantity_kg: str = Form("")):
         self.values = {name: value.strip() for name, value in zip(
-            FIELD_NAMES, (event_at, area_id, category_id, reason_id, quantity_kg))}
+            FIELD_NAMES, (event_at, area_id, reason_id, quantity_kg))}
 
 
 def render_panel(request: Request, db: Session, *, lookups, actor_name, values=None,
@@ -41,8 +40,8 @@ def render_panel(request: Request, db: Session, *, lookups, actor_name, values=N
     """The overview with the add panel (or, given record_id, the edit panel) open."""
     panel = {
         "editing": record_id is not None, "record_id": record_id,
-        "areas": lookups.get("areas", []), "categories": lookups.get("categories", []),
-        "reasons": lookups.get("reasons", []), "actor_name": actor_name,
+        "areas": lookups.get("areas", []), "reasons": lookups.get("reasons", []),
+        "actor_name": actor_name,
         "values": values or {}, "errors": errors or {}, "message": message,
         "close_url": url_path(request.app, "dashboard", **view_state(request)),
     }
@@ -70,7 +69,6 @@ def parse_form(values, lookups):
 
     selected_ids = {}
     for field, label, items in (("area_id", "source area", lookups["areas"]),
-                                ("category_id", "food category", lookups["categories"]),
                                 ("reason_id", "reason for waste", lookups["reasons"])):
         raw_id = values[field]
         if not raw_id:
