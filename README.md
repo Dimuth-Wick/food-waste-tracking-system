@@ -132,11 +132,27 @@ Inference uses RGB pixels, `tf.image.resize(image, (224, 224))`, and `tf.keras.a
 
 ## Food item counting (OWLv2)
 
-Open <http://127.0.0.1:5000/food-detection> (**Food counting** in the sidebar), upload a photo, and type what to count, such as `cupcake`, `egg` or `bread roll`. The page uses the open-vocabulary detector [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) from Hugging Face Transformers (PyTorch). It finds objects from a text description, so it can count items without fine-tuning. Each match is boxed and numbered, overlapping boxes on the same item are counted once, and the total is shown at the top. You can choose a minimum confidence of 20%, 30% or 50%.
+Open <http://127.0.0.1:5000/food-detection> (**Food counting** in the sidebar). Drop, paste (Ctrl+V) or browse for a photo, type what to count, such as `cupcake`, `egg` or `bread roll`, and press **Count**. A numbered pin drops onto each item the model finds while the total and its tally build up. You can then:
 
-The first count downloads about 600 MB of model weights into the Hugging Face cache (`%USERPROFILE%\.cache\huggingface`), so it needs an internet connection and takes longer. Later counts take about 5 seconds on a CPU. To run offline, save the model to a folder with `save_pretrained` and set `FOOD_DETECTOR_MODEL_NAME` in the app config to that folder.
+- drag the **Minimum confidence** slider to see the count change instantly, without re-running the model;
+- click any pin or list row to remove a wrong item from the count, and click again to restore it;
+- hover a list row to highlight its item in the photo.
 
-Counting works for separate items photographed from above. It does not work for loose food such as rice, curry or salad, and stacked or cut-off items may be miscounted. For the hotel's own dishes, the long-term option is fine-tuning a detector on labelled hotel photos. Uploaded images and counts are not saved.
+The page uses the open-vocabulary detector [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) from Hugging Face Transformers (PyTorch). It finds objects from a text description, so it can count items without fine-tuning. Overlapping boxes on the same item are counted once. The first count downloads about 600 MB of model weights into the Hugging Face cache (`%USERPROFILE%\.cache\huggingface`). To run offline, save the model with `save_pretrained` and set `FOOD_DETECTOR_MODEL_NAME` in the app config to that folder.
+
+Counting works for separate items photographed from above. It does not work for loose food such as rice, curry or salad, and stacked or cut-off items may be miscounted. Uploaded photos and counts are not saved.
+
+### React frontend
+
+The Food counting page is a React app in [`frontend/`](frontend/), mounted inside the Flask layout. It calls `POST /api/food-count` (multipart `image` and `item`), which returns every match at 20% confidence or more with its box in pixels. The built bundle is committed in `app/static/food-counter/`, so `python run.py` works without Node.js. To change the React code, install [Node.js](https://nodejs.org/), then:
+
+```powershell
+cd frontend
+npm install
+npm run watch   # rebuilds app/static/food-counter on every save; refresh the browser
+```
+
+Run `npm run build` once before committing so the committed bundle matches the source.
 
 Run tests with `.venv\Scripts\python.exe -m pip install -r requirements-dev.txt` and `.venv\Scripts\python.exe -m pytest -q --basetemp .pytest-run`.
 

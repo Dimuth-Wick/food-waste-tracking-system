@@ -1,0 +1,273 @@
+/* Food counting page. Colours come from the app shell in app/static/styles.css;
+   brass is the one accent and marks everything that is counted. */
+.fc {
+  --fc-pine: #173b34;
+  --fc-leaf: #1d7057;
+  --fc-leaf-dark: #155f4a;
+  --fc-brass: #b8924f;
+  --fc-brass-deep: #8a6a31;
+  --fc-linen: #f5f6f2;
+  --fc-mist: #e8f1e8;
+  --fc-line: #dbe4dc;
+  --fc-muted: #5f746b;
+  --fc-removed: #b85544;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+/* ---- Photo stage ---------------------------------------------------- */
+
+.fc-stage {
+  position: relative;
+  min-height: 460px;
+  border-radius: 16px;
+  background: var(--fc-pine);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.fc-drop {
+  cursor: pointer;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+  color: #e6f0ea;
+  border: 2px dashed #3f6a5e;
+  transition: border-color .15s, background-color .15s;
+}
+.fc-drop:hover, .fc-drop.is-dragging, .fc-drop:focus-within {
+  border-color: var(--fc-brass);
+  background: #1c463e;
+}
+.fc-file { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.fc-drop:focus-within { outline: 3px solid #2b9371; outline-offset: 3px; }
+.fc-drop-icon { width: 92px; margin-bottom: 14px; fill: none; stroke: var(--fc-brass); stroke-width: 2.5; }
+.fc-drop-title { font-size: 1.3rem; font-weight: 750; letter-spacing: -.02em; color: #fff; }
+.fc-drop-text { color: #c9ded3; }
+.fc-drop-browse { color: #fff; text-decoration: underline; text-decoration-color: var(--fc-brass); text-underline-offset: 3px; }
+.fc-drop-note { margin-top: 18px; color: #8fb3a6; font-size: .84rem; }
+
+.fc-photo-stage.is-dragging { outline: 3px dashed var(--fc-brass); outline-offset: -10px; }
+.fc-photo { position: relative; display: inline-block; max-width: 100%; line-height: 0; }
+.fc-photo img {
+  display: block;
+  max-width: 100%;
+  max-height: 68vh;
+  border-radius: 8px;
+  transition: filter .3s;
+}
+.fc-photo.is-counting img { filter: saturate(.55) brightness(.8); }
+
+.fc-scan {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--fc-brass);
+  box-shadow: 0 0 18px 4px rgba(184, 146, 79, .55);
+  animation: fc-scan 1.6s ease-in-out infinite alternate;
+}
+@keyframes fc-scan { from { top: 0; } to { top: calc(100% - 3px); } }
+.fc-stage-status {
+  position: absolute;
+  bottom: 18px;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(23, 59, 52, .85);
+  color: #fff;
+  font-size: .84rem;
+  font-weight: 650;
+}
+
+.fc-box {
+  position: absolute;
+  border: 2px solid rgba(255, 255, 255, .55);
+  border-radius: 8px;
+  pointer-events: none;
+  transition: border-color .15s, background-color .15s;
+}
+.fc-box.is-active { border-color: var(--fc-brass); background: rgba(184, 146, 79, .16); }
+.fc-box.is-removed { border-color: rgba(184, 85, 68, .7); border-style: dashed; }
+
+.fc-pin {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--fc-brass);
+  color: #fff;
+  font-size: .9rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .35);
+  cursor: pointer;
+  animation: fc-pin-drop .38s cubic-bezier(.3, 1.5, .5, 1) backwards;
+  transition: transform .15s, background-color .15s;
+}
+.fc-pin:hover, .fc-pin.is-active { transform: scale(1.18); background: var(--fc-brass-deep); }
+.fc-pin.is-removed { background: var(--fc-removed); font-size: 1.15rem; }
+@keyframes fc-pin-drop {
+  from { opacity: 0; transform: translateY(-22px) scale(.6); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Control panel -------------------------------------------------- */
+
+.fc-panel {
+  padding: 22px;
+  border: 1px solid #e2e9e2;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 5px 18px rgba(27, 69, 49, .04);
+}
+.fc-form { display: grid; gap: 10px; }
+.fc-label { color: #2e4e3e; font-size: .88rem; font-weight: 700; }
+.fc-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 13px;
+  border: 1px solid #baccc0;
+  border-radius: 9px;
+  color: #27483a;
+  font-size: 1rem;
+}
+.fc-input:focus { border-color: #50a880; outline: 3px solid #e2f3e8; }
+.fc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fc-chip {
+  padding: 5px 11px;
+  border: 1px solid var(--fc-line);
+  border-radius: 999px;
+  background: var(--fc-linen);
+  color: #36594a;
+  font-size: .82rem;
+  cursor: pointer;
+}
+.fc-chip:hover { border-color: #aac3b4; }
+.fc-chip[aria-pressed="true"] { border-color: var(--fc-leaf); background: var(--fc-mist); color: var(--fc-pine); font-weight: 700; }
+
+.fc-count-button {
+  margin-top: 6px;
+  min-height: 50px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--fc-leaf);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(19, 88, 68, .16);
+}
+.fc-count-button:hover:not(:disabled) { background: var(--fc-leaf-dark); }
+.fc-count-button:disabled { background: #7fa392; cursor: progress; }
+.fc-link-button {
+  justify-self: start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--fc-leaf);
+  font-size: .86rem;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.fc-error {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-left: 4px solid var(--fc-removed);
+  border-radius: 8px;
+  background: #fff5f2;
+  color: #793b32;
+  font-size: .88rem;
+}
+.fc-intro, .fc-empty { margin: 20px 0 0; color: var(--fc-muted); font-size: .9rem; }
+
+.fc-result { margin-top: 22px; padding-top: 20px; border-top: 1px solid #e7eee9; transition: opacity .2s; }
+.fc-result.is-stale { opacity: .6; }
+.fc-result-heading { display: flex; align-items: baseline; gap: 10px; margin: 0; color: var(--fc-pine); font-size: 1.05rem; font-weight: 650; }
+.fc-total {
+  font-size: 3.6rem;
+  font-weight: 800;
+  line-height: .95;
+  letter-spacing: -.05em;
+  font-variant-numeric: tabular-nums;
+}
+
+.fc-tally { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 12px 0 6px; }
+.fc-tally-group { width: 38px; height: 32px; }
+.fc-tally-group line {
+  stroke: var(--fc-brass);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-dasharray: 60;
+  animation: fc-stroke .3s ease-out both;
+}
+@keyframes fc-stroke { from { stroke-dashoffset: 60; } to { stroke-dashoffset: 0; } }
+
+.fc-hint { margin: 8px 0 0; color: var(--fc-muted); font-size: .82rem; line-height: 1.45; }
+
+.fc-slider-label { display: flex; justify-content: space-between; margin-top: 20px; }
+.fc-slider-label output { color: var(--fc-pine); font-variant-numeric: tabular-nums; }
+.fc-slider { width: 100%; margin: 8px 0 0; accent-color: var(--fc-leaf); }
+
+.fc-list { display: grid; gap: 4px; margin: 18px 0 0; padding: 0; list-style: none; }
+.fc-list li { opacity: 0; }
+.fc-list li.is-shown { opacity: 1; transition: opacity .2s; }
+.fc-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 26px 1fr 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: #27483a;
+  font-size: .86rem;
+  text-align: left;
+  cursor: pointer;
+}
+.fc-row:hover, .fc-row.is-active { border-color: var(--fc-line); background: var(--fc-linen); }
+.fc-row-number {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--fc-brass);
+  color: #fff;
+  font-size: .76rem;
+  font-weight: 800;
+}
+.fc-row-bar { height: 6px; border-radius: 3px; background: #edf2ee; overflow: hidden; }
+.fc-row-bar span { display: block; height: 100%; background: var(--fc-leaf); }
+.fc-row-value { text-align: right; font-variant-numeric: tabular-nums; }
+.fc-row.is-removed { color: #9a8580; }
+.fc-row.is-removed .fc-row-number { background: var(--fc-removed); }
+.fc-row.is-removed .fc-row-bar span { background: #d9b8b0; }
+.fc-row.is-removed .fc-row-value { text-decoration: line-through; }
+
+@media (pointer: coarse) {
+  .fc-drop-paste { display: none; }
+}
+
+@media (max-width: 1100px) {
+  .fc { grid-template-columns: 1fr; }
+  .fc-stage { min-height: 320px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fc-scan { animation: none; top: 50%; }
+  .fc-pin, .fc-tally-group line { animation: none; }
+  .fc-list li { opacity: 1; }
+}

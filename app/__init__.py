@@ -45,6 +45,9 @@ def create_app(test_config=None):
                      view_func=food_classifier.food_prediction, methods=["GET", "POST"])
 
     app.add_url_rule("/food-detection", endpoint="food_detection",
-                     view_func=food_detector.food_detection, methods=["GET", "POST"])
+                     view_func=food_detector.food_detection, methods=["GET"])
+
+    app.add_url_rule("/api/food-count", endpoint="count_food",
+                     view_func=food_detector.count_food, methods=["POST"])
 
     return app

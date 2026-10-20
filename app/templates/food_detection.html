@@ -5,94 +5,15 @@
   <div>
     <p class="eyebrow">COMPUTER VISION DEMO</p>
     <h1>Food counting</h1>
-    <p class="page-description">Upload a photo, type what to count, and the model boxes and numbers every match.</p>
+    <p class="page-description">Add a photo, type what to count, and check each item the model pins. Counts are not saved as waste records.</p>
   </div>
 </div>
 
-<div class="notice">
-  <strong>Open-vocabulary detector</strong>
-  This page uses <code>google/owlv2-base-patch16-ensemble</code>, which finds objects from a text description, so it can count items it was never trained on, like cupcakes, eggs or bread rolls. It counts separate items, not loose food such as rice or curry. Counts are not saved as waste records.
+<link rel="stylesheet" href="{{ url_for('static', filename='food-counter/food-counter.css') }}">
+<div id="food-counter" data-settings="{{ settings|tojson|forceescape }}">
+  <noscript>
+    <div class="notice notice-error">Food counting needs JavaScript. Turn it on in your browser and reload the page.</div>
+  </noscript>
 </div>
-
-<section class="panel form-panel" aria-labelledby="upload-heading">
-  <div class="panel-heading"><h2 id="upload-heading">Choose an image</h2></div>
-  {% if error %}
-    <div class="notice notice-error" role="alert">{{ error }}</div>
-  {% endif %}
-  <form method="post" enctype="multipart/form-data">
-    <div class="form-field">
-      <label for="image">Photo <span>*</span></label>
-      <div class="food-upload-box">
-        <input id="image" name="image" type="file" accept="image/*" required>
-        <small>A photo from above with items not stacked works best. Maximum size: 8 MB.</small>
-        <p id="selected-file" class="food-selected-file" aria-live="polite">No image selected yet.</p>
-        <img id="selected-preview" class="food-preview food-selected-preview" alt="Preview of selected photo" hidden>
-      </div>
-    </div>
-    <div class="form-field">
-      <label for="item">What to count <span>*</span></label>
-      <input id="item" name="item" type="text" value="{{ item }}" maxlength="{{ max_item_length }}" placeholder="e.g. cupcake, egg, bread roll" required>
-      <small>Use one item name in English, in the singular.</small>
-    </div>
-    <div class="form-field">
-      <label for="threshold">Minimum confidence</label>
-      <select id="threshold" name="threshold">
-        {% for value in thresholds %}
-        <option value="{{ value }}" {% if value == threshold %}selected{% endif %}>{{ value }}%</option>
-        {% endfor %}
-      </select>
-      <small>Lower finds more items but may count things that are not a match.</small>
-    </div>
-    <div class="form-actions">
-      <button id="count-button" class="button button-primary" type="submit">Count items</button>
-    </div>
-  </form>
-</section>
-
-{% if detections is not none %}
-<section class="panel food-prediction-panel detection-panel" aria-labelledby="count-heading">
-  <div class="panel-heading"><h2 id="count-heading">Count</h2></div>
-  <p class="food-result-label">Number of “{{ item }}” found</p>
-  <p class="detection-count">{{ detections|length }}</p>
-  <img class="detection-preview" src="data:image/jpeg;base64,{{ preview }}" alt="Uploaded photo with each counted {{ item }} outlined and numbered">
-  {% if detections %}
-    <table class="detection-table">
-      <thead><tr><th>#</th><th>Item</th><th>Confidence</th></tr></thead>
-      <tbody>
-        {% for found in detections %}
-        <tr>
-          <td>{{ loop.index }}</td>
-          <td>{{ item|capitalize }}</td>
-          <td>{{ "%.1f"|format(found.confidence) }}%</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p class="food-result-confidence">No “{{ item }}” found at {{ threshold }}%+ confidence. Try a lower minimum confidence or a different name.</p>
-  {% endif %}
-  <p class="food-result-note">Overlapping boxes on the same item are counted once. Check the numbered boxes before using the count in a waste record.</p>
-</section>
-{% endif %}
-<script>
-  const imageInput = document.getElementById("image");
-  const selectedFile = document.getElementById("selected-file");
-  const selectedPreview = document.getElementById("selected-preview");
-  const countButton = document.getElementById("count-button");
-  let previewUrl;
-  imageInput.addEventListener("change", () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    const file = imageInput.files[0];
-    selectedFile.textContent = file ? file.name : "No image selected yet.";
-    selectedPreview.hidden = !file;
-    if (file) {
-      previewUrl = URL.createObjectURL(file);
-      selectedPreview.src = previewUrl;
-    }
-  });
-  imageInput.form.addEventListener("submit", () => {
-    countButton.disabled = true;
-    countButton.textContent = "Counting…";
-  });
-</script>
+<script type="module" src="{{ url_for('static', filename='food-counter/food-counter.js') }}"></script>
 {% endblock %}
