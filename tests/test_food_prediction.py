@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image
 
 from app import create_app
-from app import food_classifier
+from app.vision import prediction
 
 
 class FakeFoodModel:
@@ -29,7 +29,7 @@ def test_food_prediction_page_and_image_upload(monkeypatch, tmp_path):
         "DATABASE": str(tmp_path / "test.sqlite3"),
         "FOOD_CLASSIFIER_MODEL": FakeFoodModel(),
     })
-    monkeypatch.setattr(food_classifier, "_prepare_image", lambda image: np.zeros((1, 224, 224, 3)))
+    monkeypatch.setattr(prediction, "_prepare_image", lambda image: np.zeros((1, 224, 224, 3)))
     client = app.test_client()
     page = client.get("/food-prediction")
     assert page.status_code == 200
@@ -69,7 +69,7 @@ def test_food_prediction_rejects_missing_and_invalid_uploads(tmp_path):
 
 
 def test_food101_label_order():
-    assert len(food_classifier.LABELS) == 101
-    assert food_classifier.LABELS[0] == "apple_pie"
-    assert food_classifier.LABELS[76] == "pizza"
-    assert food_classifier.LABELS[-1] == "waffles"
+    assert len(prediction.LABELS) == 101
+    assert prediction.LABELS[0] == "apple_pie"
+    assert prediction.LABELS[76] == "pizza"
+    assert prediction.LABELS[-1] == "waffles"

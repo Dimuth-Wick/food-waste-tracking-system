@@ -14,7 +14,8 @@ import sqlite3
 import datetime
 from pathlib import Path
 
-DB_PATH = Path("instance/food_waste.sqlite3")
+# The app's database, found from this file so the script works from any folder.
+DB_PATH = Path(__file__).resolve().parent.parent / "instance" / "food_waste.sqlite3"
 
 # Define the 5 food items and appropriate meal types for them
 ITEMS = [

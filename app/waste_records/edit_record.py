@@ -5,9 +5,9 @@ import sqlite3
 
 from flask import abort, current_app, redirect, request, url_for
 
-from app.db import get_db
-from app.entry import DEMO_TIMEZONE, FIELD_NAMES, _parse_form, _render_form
-from app.models import get_user_by_username, get_waste_record, list_lookup_items, update_waste_record
+from app.database.connection import get_db
+from app.waste_records.add_record import DEMO_TIMEZONE, FIELD_NAMES, _parse_form, _render_form
+from app.database.queries import get_user_by_username, get_waste_record, list_lookup_items, update_waste_record
 
 
 def can_edit(actor, record_user_id: int) -> bool:

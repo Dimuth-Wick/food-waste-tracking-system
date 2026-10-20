@@ -1,9 +1,9 @@
 import pytest
 
 from app import create_app
-from app.db import get_db, init_db
-from app.models import create_user, create_waste_record, get_waste_record
-from app.seed import seed_demo_data
+from app.database.connection import get_db, init_db
+from app.database.queries import create_user, create_waste_record, get_waste_record
+from app.database.seed import seed_demo_data
 from datetime import datetime, timezone
 
 

@@ -6,10 +6,10 @@ import sqlite3
 
 from flask import current_app, render_template, request
 
-from app.db import get_db
-from app.entry import DEMO_TIMEZONE, _parse_id
-from app.edit_record import can_edit
-from app.models import get_user_by_username, list_lookup_items, list_waste_records
+from app.database.connection import get_db
+from app.waste_records.add_record import DEMO_TIMEZONE, _parse_id
+from app.waste_records.edit_record import can_edit
+from app.database.queries import get_user_by_username, list_lookup_items, list_waste_records
 
 
 FILTER_FIELDS = ("start_date", "end_date", "area_id", "category_id", "reason_id")

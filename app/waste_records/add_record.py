@@ -7,8 +7,8 @@ import sqlite3
 
 from flask import current_app, redirect, render_template, request, url_for
 
-from app.db import get_db
-from app.models import (
+from app.database.connection import get_db
+from app.database.queries import (
     create_waste_record,
     get_user_by_username,
     get_waste_record,

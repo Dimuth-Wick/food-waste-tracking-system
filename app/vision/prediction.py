@@ -6,7 +6,7 @@ import numpy as np
 from flask import current_app, jsonify, render_template, url_for
 from PIL import ImageOps
 
-from app.image_upload import UploadError, read_uploaded_image
+from app.vision.uploads import UploadError, read_uploaded_image
 
 
 MODEL_FILENAME = "food101_mobilenetv2.keras"
@@ -25,7 +25,7 @@ def _model_path():
     return Path(
         current_app.config.get(
             "FOOD_CLASSIFIER_MODEL_PATH",
-            Path(current_app.root_path).parent / "models" / MODEL_FILENAME,
+            Path(current_app.root_path).parent / "ml_models" / MODEL_FILENAME,
         )
     )
 

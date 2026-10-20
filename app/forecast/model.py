@@ -26,7 +26,7 @@ def _default_model_path(app):
     """Resolve the model file path relative to the project root."""
     # app.root_path points to the ``app/`` package directory.
     project_root = Path(app.root_path).parent
-    return project_root / "models" / MODEL_FILENAME
+    return project_root / "ml_models" / MODEL_FILENAME
 
 
 def init_app(app):
@@ -55,7 +55,7 @@ def init_app(app):
             f"  *** ML model file not found ***\n"
             f"  Expected path : {model_path}\n"
             f"  Please place your trained scikit-learn pipeline at:\n"
-            f"      models/{MODEL_FILENAME}\n"
+            f"      ml_models/{MODEL_FILENAME}\n"
             f"  (relative to the project root)\n"
         )
 
@@ -68,7 +68,7 @@ def get_model():
 
     Usage from any view or module:
 
-        from app.ml import get_model
+        from app.forecast.model import get_model
         model = get_model()
         prediction = model.predict(df)
     """

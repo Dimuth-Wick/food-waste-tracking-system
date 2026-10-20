@@ -3,15 +3,15 @@ from datetime import date, datetime
 import pytest
 
 from app import create_app
-from app.db import get_db, init_db
-from app.entry import DEMO_TIMEZONE
-from app.models import create_user, create_waste_record
+from app.database.connection import get_db, init_db
+from app.waste_records.add_record import DEMO_TIMEZONE
+from app.database.queries import create_user, create_waste_record
 
 
 @pytest.fixture
 def dashboard_app(tmp_path, monkeypatch):
     app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "dashboard.sqlite3")})
-    monkeypatch.setattr("app.dashboard._now_local", lambda: datetime(2026, 10, 2, 12, tzinfo=DEMO_TIMEZONE))
+    monkeypatch.setattr("app.waste_records.dashboard._now_local", lambda: datetime(2026, 10, 2, 12, tzinfo=DEMO_TIMEZONE))
     with app.app_context():
         init_db()
         db = get_db()

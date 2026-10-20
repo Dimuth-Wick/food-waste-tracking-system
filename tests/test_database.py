@@ -5,15 +5,15 @@ import pytest
 from werkzeug.security import check_password_hash
 
 from app import create_app
-from app.db import get_db, init_db
-from app.models import (
+from app.database.connection import get_db, init_db
+from app.database.queries import (
     create_user,
     create_waste_record,
     get_user_by_username,
     get_waste_record,
     list_lookup_items,
 )
-from app.seed import seed_demo_data
+from app.database.seed import seed_demo_data
 
 
 @pytest.fixture

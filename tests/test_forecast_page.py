@@ -2,7 +2,7 @@ import json
 from html import unescape
 
 from app import create_app
-from app.forecast import FOOD_ITEMS, MEAL_TYPES
+from app.forecast.views import FOOD_ITEMS, MEAL_TYPES
 
 
 def test_forecast_page_mounts_react_app(tmp_path):

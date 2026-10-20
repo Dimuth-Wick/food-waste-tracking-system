@@ -1,9 +1,9 @@
 import pytest
 
 from app import create_app
-from app.db import get_db, init_db
-from app.models import get_user_by_username
-from app.seed import seed_demo_data
+from app.database.connection import get_db, init_db
+from app.database.queries import get_user_by_username
+from app.database.seed import seed_demo_data
 
 
 @pytest.fixture

@@ -6,10 +6,10 @@ import sqlite3
 
 from flask import current_app, render_template, request
 
-from app.db import get_db
-from app.entry import DEMO_TIMEZONE
-from app.models import list_lookup_items, list_waste_records
-from app.record_list import FILTER_FIELDS, _parse_filters, _utc_boundary
+from app.database.connection import get_db
+from app.waste_records.add_record import DEMO_TIMEZONE
+from app.database.queries import list_lookup_items, list_waste_records
+from app.waste_records.record_list import FILTER_FIELDS, _parse_filters, _utc_boundary
 
 
 def _now_local():

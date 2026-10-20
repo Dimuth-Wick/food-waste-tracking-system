@@ -33,7 +33,7 @@ def init_db():
     if version != 0:
         raise RuntimeError(f"Unsupported database schema version: {version}")
 
-    schema = current_app.open_resource("schema.sql").read().decode("utf-8")
+    schema = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
     connection.executescript(schema)
     connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     connection.commit()
@@ -46,7 +46,7 @@ def init_db_command(seed):
     init_db()
     click.echo("Database schema ready.")
     if seed:
-        from app.seed import seed_demo_data
+        from app.database.seed import seed_demo_data
 
         credentials = seed_demo_data(get_db())
         click.echo("Synthetic demo data added. Save these one-time passwords:")

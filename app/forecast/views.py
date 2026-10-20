@@ -5,7 +5,7 @@ a predicted consumption figure with a 10 % safety margin, plus
 the GET page that hosts the forecast form.
 
 The endpoint does **not** touch the waste-record database; it only uses
-the scikit-learn pipeline loaded at startup via :mod:`app.ml`.
+the scikit-learn pipeline loaded at startup via :mod:`app.forecast.model`.
 """
 
 import traceback
@@ -13,8 +13,8 @@ import json
 import pandas as pd
 from flask import current_app, jsonify, render_template, request, url_for
 
-from app.ml import get_model
-from app.db import get_db
+from app.forecast.model import get_model
+from app.database.connection import get_db
 
 # Food items and meal types the model was trained on.
 MEAL_TYPES = ["Breakfast", "Lunch", "Dinner"]

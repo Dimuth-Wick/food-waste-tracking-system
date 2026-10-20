@@ -9,7 +9,7 @@ import re
 
 from flask import current_app, jsonify, render_template, request, url_for
 
-from app.image_upload import UploadError, read_uploaded_image
+from app.vision.uploads import UploadError, read_uploaded_image
 
 
 MODEL_NAME = "google/owlv2-base-patch16-ensemble"
@@ -32,7 +32,7 @@ def _load_detector():
     import torch
     from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
 
-    name = current_app.config.get("FOOD_DETECTOR_MODEL_NAME", MODEL_NAME)
+    name = current_app.config.get("FOOD_COUNTER_MODEL_NAME", MODEL_NAME)
     processor = AutoProcessor.from_pretrained(name)
     model = AutoModelForZeroShotObjectDetection.from_pretrained(name).eval()
 
@@ -56,13 +56,13 @@ def _load_detector():
 
 def _get_detector():
     """Load once per Flask app; tests may supply a detector through config."""
-    detector = current_app.config.get("FOOD_DETECTOR")
+    detector = current_app.config.get("FOOD_COUNTER")
     if detector is not None:
         return detector
-    detector = current_app.extensions.get("food_detector")
+    detector = current_app.extensions.get("food_counter")
     if detector is None:
         detector = _load_detector()
-        current_app.extensions["food_detector"] = detector
+        current_app.extensions["food_counter"] = detector
     return detector
 
 
@@ -112,12 +112,12 @@ def _error(message, status):
     return jsonify({"error": message}), status
 
 
-def food_detection():
-    """``GET /food-detection`` - the React counting page."""
+def food_counting():
+    """``GET /food-counting`` - the React counting page."""
     return render_template(
         "_react_page.html",
         react_page="counting",
-        active_page="food_detection",
+        active_page="food_counting",
         heading="Food counting",
         description=("Add a photo, type what to count, and check each item the model "
                      "pins. Counts are not saved as waste records."),

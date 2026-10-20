@@ -1,8 +1,8 @@
 import pytest
 
 from app import create_app
-from app.db import get_db, init_db
-from app.seed import seed_demo_data
+from app.database.connection import get_db, init_db
+from app.database.seed import seed_demo_data
 
 
 @pytest.mark.parametrize(
@@ -13,7 +13,7 @@ from app.seed import seed_demo_data
         ("/records/new", "Add waste record", 'href="/records/new" aria-current="page"'),
         ("/forecast", "Meal demand forecast", 'href="/forecast" aria-current="page"'),
         ("/food-prediction", "Food image prediction", 'href="/food-prediction" aria-current="page"'),
-        ("/food-detection", "Food counting", 'href="/food-detection" aria-current="page"'),
+        ("/food-counting", "Food counting", 'href="/food-counting" aria-current="page"'),
     ],
 )
 def test_main_pages_and_navigation(path, heading, current_path, tmp_path):

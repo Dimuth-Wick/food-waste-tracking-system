@@ -26,7 +26,7 @@
           <ul aria-labelledby="nav-models">
             <li><a href="{{ url_for('forecast') }}" {% if active_page == 'forecast' %}aria-current="page"{% endif %}>Meal forecast</a></li>
             <li><a href="{{ url_for('food_prediction') }}" {% if active_page == 'food_prediction' %}aria-current="page"{% endif %}>Food image prediction</a></li>
-            <li><a href="{{ url_for('food_detection') }}" {% if active_page == 'food_detection' %}aria-current="page"{% endif %}>Food counting</a></li>
+            <li><a href="{{ url_for('food_counting') }}" {% if active_page == 'food_counting' %}aria-current="page"{% endif %}>Food counting</a></li>
           </ul>
         </nav>
         <div class="sidebar-note">

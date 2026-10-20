@@ -3,9 +3,9 @@
 from datetime import datetime
 
 from app import create_app
-from app.db import get_db, init_db
-from app.entry import DEMO_TIMEZONE
-from app.models import create_user, get_waste_record
+from app.database.connection import get_db, init_db
+from app.waste_records.add_record import DEMO_TIMEZONE
+from app.database.queries import create_user, get_waste_record
 
 
 def _review_app(database_path):
@@ -38,7 +38,7 @@ def _form(quantity="2.5"):
 
 
 def test_complete_record_flow_persists_after_reopening_app(tmp_path, monkeypatch):
-    monkeypatch.setattr("app.dashboard._now_local",
+    monkeypatch.setattr("app.waste_records.dashboard._now_local",
                         lambda: datetime(2026, 10, 2, 15, tzinfo=DEMO_TIMEZONE))
     database_path = tmp_path / "review.sqlite3"
     app = _review_app(database_path)

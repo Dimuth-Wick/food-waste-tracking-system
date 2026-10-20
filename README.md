@@ -94,7 +94,7 @@ The current application follows this general architecture:
        Web Dashboard
 ```
 
-The frontend provides the user interface, FastAPI handles backend requests, and the machine learning model generates food consumption predictions.
+The frontend provides the user interface, Flask handles backend requests, and the machine learning model generates food consumption predictions.
 
 ## 🤖 Machine Learning
 
@@ -126,19 +126,19 @@ On Windows PowerShell, create a virtual environment with `py -3.12 -m venv .venv
 
 ## Temporary Food-101 image prediction
 
-Open <http://127.0.0.1:5000/food-prediction> and upload one food image (up to 8 MB). The page displays the three most likely Food-101 labels and their model confidence. The supplied `models/food101_mobilenetv2.keras` is loaded on the first prediction. The existing forecasting model and waste-record pages continue to use their existing routes.
+Open <http://127.0.0.1:5000/food-prediction> and upload one food image (up to 8 MB). The page displays the three most likely Food-101 labels and their model confidence. The supplied `ml_models/food101_mobilenetv2.keras` is loaded on the first prediction. The existing forecasting model and waste-record pages continue to use their existing routes.
 
 Inference uses RGB pixels, `tf.image.resize(image, (224, 224))`, and `tf.keras.applications.mobilenet_v2.preprocess_input`, matching the training code. `app/food101_labels.txt` contains the ordered class names from TensorFlow Datasets' Food-101 label file. This model classifies the whole image among 101 foods; it does not locate multiple items, read CCTV, or estimate kilograms. Uploaded images and predictions are not saved to the database.
 
 ## Food item counting (OWLv2)
 
-Open <http://127.0.0.1:5000/food-detection> (**Food counting** in the sidebar). Drop, paste (Ctrl+V) or browse for a photo, type what to count, such as `cupcake`, `egg` or `bread roll`, and press **Count**. A numbered pin drops onto each item the model finds while the total and its tally build up. You can then:
+Open <http://127.0.0.1:5000/food-counting> (**Food counting** in the sidebar). Drop, paste (Ctrl+V) or browse for a photo, type what to count, such as `cupcake`, `egg` or `bread roll`, and press **Count**. A numbered pin drops onto each item the model finds while the total and its tally build up. You can then:
 
 - drag the **Minimum confidence** slider to see the count change instantly, without re-running the model;
 - click any pin or list row to remove a wrong item from the count, and click again to restore it;
 - hover a list row to highlight its item in the photo.
 
-The page uses the open-vocabulary detector [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) from Hugging Face Transformers (PyTorch). It finds objects from a text description, so it can count items without fine-tuning. Overlapping boxes on the same item are counted once. The first count downloads about 600 MB of model weights into the Hugging Face cache (`%USERPROFILE%\.cache\huggingface`). To run offline, save the model with `save_pretrained` and set `FOOD_DETECTOR_MODEL_NAME` in the app config to that folder.
+The page uses the open-vocabulary detector [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) from Hugging Face Transformers (PyTorch). It finds objects from a text description, so it can count items without fine-tuning. Overlapping boxes on the same item are counted once. The first count downloads about 600 MB of model weights into the Hugging Face cache (`%USERPROFILE%\.cache\huggingface`). To run offline, save the model with `save_pretrained` and set `FOOD_COUNTER_MODEL_NAME` in the app config to that folder.
 
 Counting works for separate items photographed from above. It does not work for loose food such as rice, curry or salad, and stacked or cut-off items may be miscounted. Uploaded photos and counts are not saved.
 
@@ -164,9 +164,38 @@ npm run watch   # rebuilds app/static/react on every save; refresh the browser
 
 Run `npm run build` once before committing so the committed files match the source.
 
-To see the forecast history chart with sample data, run `python seed_demo_history.py`. It adds demo records, marked as demo data, to `instance/food_waste.sqlite3`.
+To see the forecast history chart with sample data, run `python scripts/seed_demo_history.py`. It adds demo records, marked as demo data, to `instance/food_waste.sqlite3`.
 
 Run tests with `.venv\Scripts\python.exe -m pip install -r requirements-dev.txt` and `.venv\Scripts\python.exe -m pytest -q --basetemp .pytest-run`.
+
+## 🧭 Project map
+
+Each backend feature has its own folder in `app/`, named after the page it serves. The React pages in `frontend/src/` use the same names.
+
+```text
+food-waste-tracking-system/
+├── run.py                  Starts the web app (python run.py)
+├── app/                    Flask backend
+│   ├── __init__.py         create_app() and every page and API URL, in one place
+│   ├── database/           SQLite connection, schema, queries and demo seed data
+│   ├── waste_records/      Dashboard, Waste records, Add and Edit record pages
+│   ├── forecast/           Meal forecast page, its JSON APIs and the forecast model loader
+│   ├── vision/             Food image prediction and Food counting pages, shared upload checks
+│   ├── templates/          HTML for the Flask-rendered pages and the shared layout
+│   └── static/             styles.css for every page; react/ holds the built React pages
+├── frontend/               React source for three pages (Node.js only needed to change them)
+│   └── src/                forecast/, prediction/, counting/ and shared/
+├── ml_models/              Trained model files: forecast (.pkl) and Food-101 classifier (.keras)
+├── scripts/                One-off helper scripts, such as seed_demo_history.py
+└── tests/                  pytest tests, one file per feature
+```
+
+Where to start:
+
+- **Change a page's URL or add a page:** `app/__init__.py`.
+- **Change the dashboard, records or record form:** `app/waste_records/` and `app/templates/`.
+- **Change the forecast, prediction or counting page:** the Python view in `app/forecast/` or `app/vision/`, and the matching React folder in `frontend/src/`. Then run `npm run build` in `frontend/`.
+- **Change colours or layout used everywhere:** `app/static/styles.css`.
 
 ## 🗺️ Development Roadmap
 

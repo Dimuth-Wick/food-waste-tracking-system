@@ -1,8 +1,8 @@
 import pytest
 
 from app import create_app
-from app.db import get_db, init_db
-from app.models import create_user
+from app.database.connection import get_db, init_db
+from app.database.queries import create_user
 
 
 @pytest.fixture

@@ -6,7 +6,7 @@ from pathlib import Path
 from PIL import Image
 
 from app import create_app
-from app import food_detector
+from app.vision import counting
 
 
 class FakeDetector:
@@ -36,7 +36,7 @@ def _image_bytes():
 def _client(tmp_path, detector=None):
     config = {"TESTING": True, "DATABASE": str(tmp_path / "test.sqlite3")}
     if detector is not None:
-        config["FOOD_DETECTOR"] = detector
+        config["FOOD_COUNTER"] = detector
     return create_app(config).test_client()
 
 
@@ -47,7 +47,7 @@ def _post(client, **fields):
 
 
 def test_food_counting_page_mounts_react_app(tmp_path):
-    page = _client(tmp_path).get("/food-detection")
+    page = _client(tmp_path).get("/food-counting")
     assert page.status_code == 200
     html = page.data.decode()
     assert "<h1>Food counting</h1>" in html
@@ -57,7 +57,7 @@ def test_food_counting_page_mounts_react_app(tmp_path):
     settings = json.loads(unescape(html.split('data-settings="')[1].split('"')[0]))
     assert settings["apiUrl"] == "/api/food-count"
     assert settings["defaultItem"] == "cupcake"
-    assert settings["minConfidence"] == food_detector.MIN_CONFIDENCE
+    assert settings["minConfidence"] == counting.MIN_CONFIDENCE
 
 
 def test_react_bundles_are_built():
@@ -70,11 +70,11 @@ def test_food_count_api_returns_deduplicated_boxes(tmp_path):
     detector = FakeDetector()
     result = _post(_client(tmp_path, detector), item="  Cupcake ")
     assert result.status_code == 200
-    assert detector.calls == [("cupcake", food_detector.MIN_CONFIDENCE / 100)]
+    assert detector.calls == [("cupcake", counting.MIN_CONFIDENCE / 100)]
     data = result.get_json()
     assert data["item"] == "cupcake"
     assert data["image"] == {"width": 120, "height": 80}
-    assert data["minConfidence"] == food_detector.MIN_CONFIDENCE
+    assert data["minConfidence"] == counting.MIN_CONFIDENCE
     assert [found["confidence"] for found in data["detections"]] == [74.0, 72.0, 70.0]
     assert data["detections"][2]["box"] == [0.0, 45.0, 60.0, 80.0]
 
@@ -120,4 +120,4 @@ def test_food_count_api_returns_empty_list(tmp_path):
 
 def test_food_count_api_only_accepts_post(tmp_path):
     assert _client(tmp_path).get("/api/food-count").status_code == 405
-    assert _client(tmp_path).post("/food-detection").status_code == 405
+    assert _client(tmp_path).post("/food-counting").status_code == 405
