@@ -130,6 +130,14 @@ Open <http://127.0.0.1:5000/food-prediction> and upload one food image (up to 8 
 
 Inference uses RGB pixels, `tf.image.resize(image, (224, 224))`, and `tf.keras.applications.mobilenet_v2.preprocess_input`, matching the training code. `app/food101_labels.txt` contains the ordered class names from TensorFlow Datasets' Food-101 label file. This model classifies the whole image among 101 foods; it does not locate multiple items, read CCTV, or estimate kilograms. Uploaded images and predictions are not saved to the database.
 
+## Food object detection (YOLOS)
+
+Open <http://127.0.0.1:5000/food-detection> and upload a photo of a plate, buffet tray or table. The page uses the pretrained [`hustvl/yolos-small`](https://huggingface.co/hustvl/yolos-small) model from Hugging Face Transformers (PyTorch) to draw a box around every object it finds, and lists each one as food, tableware or other with its confidence. You can choose a minimum confidence of 50%, 70% or 90%.
+
+The first detection downloads about 120 MB of model weights into the Hugging Face cache (`%USERPROFILE%\.cache\huggingface`), so it needs an internet connection and takes longer. Later requests reuse the loaded model. To run offline, save the model to a folder with `save_pretrained` and set `FOOD_DETECTOR_MODEL_NAME` in the app config to that folder.
+
+YOLOS was trained on COCO, which has 80 object classes. Only ten are food (apple, banana, broccoli, cake, carrot, donut, hot dog, orange, pizza, sandwich), so it cannot name dishes such as curries or string hoppers, and it does not estimate kilograms. Like the Food-101 page, uploaded images and detections are not saved.
+
 Run tests with `.venv\Scripts\python.exe -m pip install -r requirements-dev.txt` and `.venv\Scripts\python.exe -m pytest -q --basetemp .pytest-run`.
 
 ## 🗺️ Development Roadmap

@@ -10,6 +10,7 @@ from app import edit_record as record_edit
 from app import record_list
 from app import forecast
 from app import food_classifier
+from app import food_detector
 
 
 def create_app(test_config=None):
@@ -42,5 +43,8 @@ def create_app(test_config=None):
 
     app.add_url_rule("/food-prediction", endpoint="food_prediction",
                      view_func=food_classifier.food_prediction, methods=["GET", "POST"])
+
+    app.add_url_rule("/food-detection", endpoint="food_detection",
+                     view_func=food_detector.food_detection, methods=["GET", "POST"])
 
     return app

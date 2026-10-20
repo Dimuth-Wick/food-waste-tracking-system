@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Food detection{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">COMPUTER VISION DEMO</p>
+    <h1>Food detection</h1>
+    <p class="page-description">Upload a photo of a plate, buffet tray or table to find and box every object the YOLOS model recognizes.</p>
+  </div>
+</div>
+
+<div class="notice">
+  <strong>Pretrained COCO detector</strong>
+  This page uses <code>hustvl/yolos-small</code>, which knows 80 everyday object classes. Only ten are food (apple, banana, broccoli, cake, carrot, donut, hot dog, orange, pizza, sandwich), so dishes like curries or string hoppers will not be named. Detections are not saved as waste records.
+</div>
+
+<section class="panel form-panel" aria-labelledby="upload-heading">
+  <div class="panel-heading"><h2 id="upload-heading">Choose an image</h2></div>
+  {% if error %}
+    <div class="notice notice-error" role="alert">{{ error }}</div>
+  {% endif %}
+  <form method="post" enctype="multipart/form-data">
+    <div class="form-field">
+      <label for="image">Photo <span>*</span></label>
+      <div class="food-upload-box">
+        <input id="image" name="image" type="file" accept="image/*" required>
+        <small>Photos with several items work best. Maximum size: 8 MB.</small>
+        <p id="selected-file" class="food-selected-file" aria-live="polite">No image selected yet.</p>
+        <img id="selected-preview" class="food-preview food-selected-preview" alt="Preview of selected photo" hidden>
+      </div>
+    </div>
+    <div class="form-field">
+      <label for="threshold">Minimum confidence</label>
+      <select id="threshold" name="threshold">
+        {% for value in thresholds %}
+        <option value="{{ value }}" {% if value == threshold %}selected{% endif %}>{{ value }}%</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-actions">
+      <button id="detect-button" class="button button-primary" type="submit">Detect objects</button>
+    </div>
+  </form>
+</section>
+
+{% if detections is not none %}
+<section class="panel food-prediction-panel detection-panel" aria-labelledby="detection-heading">
+  <div class="panel-heading"><h2 id="detection-heading">Detections</h2></div>
+  <img class="detection-preview" src="data:image/jpeg;base64,{{ preview }}" alt="Uploaded photo with detected objects outlined">
+  {% if detections %}
+    <p class="food-result-confidence">
+      {{ detections|length }} object{{ "s" if detections|length != 1 }} found at {{ threshold }}%+ confidence,
+      {{ food_count }} of them food.
+    </p>
+    <table class="detection-table">
+      <thead><tr><th>#</th><th>Object</th><th>Type</th><th>Confidence</th></tr></thead>
+      <tbody>
+        {% for item in detections %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ item.label }}</td>
+          <td><span class="detection-tag detection-tag-{{ item.group }}">{{ item.group|title }}</span></td>
+          <td>{{ "%.1f"|format(item.confidence) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="food-result-confidence">No objects found at {{ threshold }}%+ confidence. Try a lower minimum confidence.</p>
+  {% endif %}
+  <p class="food-result-note">Boxes are drawn on a downscaled copy of the photo. Review the result before using it in a waste record.</p>
+</section>
+{% endif %}
+<script>
+  const imageInput = document.getElementById("image");
+  const selectedFile = document.getElementById("selected-file");
+  const selectedPreview = document.getElementById("selected-preview");
+  const detectButton = document.getElementById("detect-button");
+  let previewUrl;
+  imageInput.addEventListener("change", () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const file = imageInput.files[0];
+    selectedFile.textContent = file ? file.name : "No image selected yet.";
+    selectedPreview.hidden = !file;
+    if (file) {
+      previewUrl = URL.createObjectURL(file);
+      selectedPreview.src = previewUrl;
+    }
+  });
+  imageInput.form.addEventListener("submit", () => {
+    detectButton.disabled = true;
+    detectButton.textContent = "Detecting…";
+  });
+</script>
+{% endblock %}

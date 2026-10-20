@@ -1,17 +1,14 @@
 """Temporary image-upload demo for the user's Food-101 MobileNetV2 model."""
 
-import base64
-import io
-import warnings
 from pathlib import Path
 
 import numpy as np
 from flask import current_app, render_template, request
-from PIL import Image, ImageOps, UnidentifiedImageError
-from werkzeug.exceptions import RequestEntityTooLarge
+from PIL import ImageOps
+
+from app.image_upload import UploadError, jpeg_preview, read_uploaded_image
 
 
-MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MODEL_FILENAME = "food101_mobilenetv2.keras"
 LABELS = tuple(
     line.strip()
@@ -86,37 +83,12 @@ def food_prediction():
     if request.method == "GET":
         return render_template("food_prediction.html", **context)
 
-    request.max_content_length = MAX_IMAGE_BYTES + 1024 * 1024
     try:
-        uploaded = request.files.get("image")
-    except RequestEntityTooLarge:
-        context["error"] = "Choose an image smaller than 8 MB."
-        return render_template("food_prediction.html", **context), 413
-    if uploaded is None or not uploaded.filename:
-        context["error"] = "Choose a food image before predicting."
-        return render_template("food_prediction.html", **context), 400
-
-    data = uploaded.stream.read(MAX_IMAGE_BYTES + 1)
-    if not data or len(data) > MAX_IMAGE_BYTES:
-        context["error"] = "Choose an image smaller than 8 MB."
-        return render_template("food_prediction.html", **context), 400
-
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", Image.DecompressionBombWarning)
-            with Image.open(io.BytesIO(data)) as image:
-                image.verify()
-            with Image.open(io.BytesIO(data)) as image:
-                image.load()
-                image = ImageOps.exif_transpose(image).convert("RGB")
-                context["predictions"] = _predict(image)
-                image.thumbnail((1000, 1000))
-                preview = io.BytesIO()
-                image.save(preview, format="JPEG", quality=85)
-    except (UnidentifiedImageError, OSError, Image.DecompressionBombError,
-            Image.DecompressionBombWarning):
-        context["error"] = "The uploaded file is not a valid image."
-        return render_template("food_prediction.html", **context), 400
+        image = read_uploaded_image("Choose a food image before predicting.")
+        context["predictions"] = _predict(image)
+    except UploadError as error:
+        context["error"] = error.message
+        return render_template("food_prediction.html", **context), error.status
     except (FileNotFoundError, ImportError):
         current_app.logger.exception("Food classifier is unavailable")
         context["error"] = "The food model is unavailable. Check the server setup."
@@ -126,5 +98,5 @@ def food_prediction():
         context["error"] = "Prediction failed. Check the server logs."
         return render_template("food_prediction.html", **context), 500
 
-    context["preview"] = base64.b64encode(preview.getvalue()).decode("ascii")
+    context["preview"] = jpeg_preview(image)
     return render_template("food_prediction.html", **context)
