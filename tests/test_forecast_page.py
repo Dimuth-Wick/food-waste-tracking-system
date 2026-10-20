@@ -21,7 +21,7 @@ def test_forecast_page_mounts_react_app(tmp_path):
     assert page.status_code == 200
     html = page.text
     assert "<h1>Meal demand forecast</h1>" in html
-    assert "<title>Meal forecast · Food Waste Tracking</title>" in html
+    assert "<title>Meal forecast · Wastewise</title>" in html
     assert 'href="/forecast" aria-current="page"' in html
     assert "react/forecast.js" in html
     settings = json.loads(unescape(html.split('data-settings="')[1].split('"')[0]))
@@ -88,7 +88,7 @@ def test_forecast_history_compares_actual_with_predicted(tmp_path):
     history = client(app).get("/api/forecast-history")
     assert history.status_code == 200
     assert history.json() == {"items": [{"food_item": "Fried rice", "history": [
-        {"date": "2026-10-01", "actual": 24.0, "predicted": 25.0},
-        {"date": "2026-10-02", "actual": 31.0, "predicted": 30.0},
+        {"date": "2026-10-01", "meal_type": "Dinner", "actual": 24.0, "predicted": 25.0},
+        {"date": "2026-10-02", "meal_type": "Dinner", "actual": 31.0, "predicted": 30.0},
     ]}]}
     assert len(model.calls) == 1  # one model call for every point

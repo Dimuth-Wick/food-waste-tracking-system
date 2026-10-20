@@ -59,7 +59,7 @@ class WasteRecord:
 
 @dataclass(frozen=True)
 class RecordFilters:
-    """Filters shared by the records list and the dashboard. None means "any"."""
+    """Filters shared by the overview's totals and record table. None means "any"."""
     start_at_utc: str | None = None
     end_before_utc: str | None = None
     area_id: int | None = None

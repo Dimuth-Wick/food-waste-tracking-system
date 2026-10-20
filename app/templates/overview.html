@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}{% if panel %}{{ 'Edit' if panel.editing else 'Add' }} waste record{% else %}Waste overview{% endif %}{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <h1>Waste overview</h1>
+    <p class="page-description">How much food has been thrown away, where it comes from, and every record behind the totals. All weights are in kilograms.</p>
+  </div>
+  <a class="button button-primary" href="{{ add_url }}">+ Add waste record</a>
+</section>
+
+{% if database_error %}
+<div class="notice notice-error" role="alert"><strong>Waste data unavailable.</strong>Check that the local database is initialized, then try again.</div>
+{% elif errors %}
+<div class="notice notice-error" role="alert"><strong>Check the filters.</strong>Correct the highlighted fields to see the totals and records.</div>
+{% elif notice %}
+<div class="notice notice-success" role="status"><strong>Record FW-{{ "%03d"|format(notice.record.id) }} {{ notice.verb }} successfully.</strong>It holds {{ "%g"|format(notice.record.quantity_kg) }} kg and is highlighted in the table below.</div>
+{% endif %}
+
+{% include '_filter_form.html' %}
+
+{% if summary %}
+<section class="summary-band" aria-label="Waste summary">
+  <article class="summary-item summary-item-total">
+    <span class="summary-label">Total recorded</span>
+    <div class="summary-value">{{ "%.2f"|format(summary.total_kg) }}<span>kg</span></div>
+    <p>{{ summary.record_count }} {{ 'record' if summary.record_count == 1 else 'records' }}{% if has_filters %} matching filters{% endif %}</p>
+  </article>
+  <article class="summary-item">
+    <span class="summary-label">Today</span>
+    <div class="summary-value">{{ "%.2f"|format(summary.today_kg) }}<span>kg</span></div>
+    <p>Sri Lanka calendar day</p>
+  </article>
+  <article class="summary-item">
+    <span class="summary-label">This week</span>
+    <div class="summary-value">{{ "%.2f"|format(summary.week_kg) }}<span>kg</span></div>
+    <p>Monday through today</p>
+  </article>
+  <article class="summary-item">
+    <span class="summary-label">This month</span>
+    <div class="summary-value">{{ "%.2f"|format(summary.month_kg) }}<span>kg</span></div>
+    <p>Month start through today</p>
+  </article>
+</section>
+
+{% if summary.record_count %}
+<section class="sheet" aria-labelledby="breakdown-title">
+  <div class="sheet-heading">
+    <h2 id="breakdown-title">Where the waste comes from</h2>
+    <span class="sheet-note">Largest source highlighted</span>
+  </div>
+  <div class="breakdown-columns">
+    {% for title, items in [('area', summary.area_breakdown), ('category', summary.category_breakdown), ('reason', summary.reason_breakdown)] %}
+    <section class="breakdown" aria-labelledby="{{ title }}-title">
+      <h3 id="{{ title }}-title">By {{ title }}</h3>
+      <div class="bar-list">
+        {% for item in items %}
+        <div class="bar-item">
+          <div class="bar-caption"><span>{{ item.name }}</span><strong>{{ "%.2f"|format(item.quantity_kg) }} kg</strong></div>
+          <div class="bar-track" role="img" aria-label="{{ item.name }}: {{ '%.2f'|format(item.quantity_kg) }} kilograms"><span class="bar-fill" style="width: {{ '%.1f'|format(item.percent) }}%"></span></div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endif %}
+
+<section class="sheet records-panel" id="records" aria-labelledby="records-title">
+  <div class="sheet-heading">
+    <h2 id="records-title">Waste records</h2>
+    {% if summary %}<span class="record-count">{% if more %}Showing {{ more.shown }} of {% endif %}{{ summary.record_count }} {{ 'record' if summary.record_count == 1 else 'records' }}</span>{% endif %}
+  </div>
+  {% if records %}
+  <ul class="weight-key" aria-label="Weight colours">
+    <li><span class="weight weight-light">Light</span> under {{ moderate_kg }} kg</li>
+    <li><span class="weight weight-moderate">Moderate</span> {{ moderate_kg }} to {{ heavy_kg }} kg</li>
+    <li><span class="weight weight-heavy">Heavy</span> {{ heavy_kg }} kg or more</li>
+  </ul>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th scope="col">Record</th><th scope="col">Date and time <small>(Sri Lanka)</small></th><th scope="col">Area</th><th scope="col">Food category</th><th scope="col">Reason</th><th scope="col">Recorded by</th><th scope="col" class="numeric">Quantity</th><th scope="col"><span class="visually-hidden">Action</span></th></tr>
+      </thead>
+      <tbody>
+        {% for record in records %}
+        <tr{% if notice and notice.record.id == record.id %} class="is-new"{% endif %}>
+          <td class="record-id"><span class="ticket">FW-{{ "%03d"|format(record.id) }}</span></td>
+          <td><strong class="cell-primary">{{ record.date }}</strong><span class="cell-secondary">{{ record.time }}</span></td>
+          <td>{{ record.area }}</td>
+          <td>{{ record.category }}</td>
+          <td>{{ record.reason }}</td>
+          <td>{{ record.recorded_by }}</td>
+          <td class="numeric amount"><span class="weight weight-{{ record.band }}" title="{{ record.band|capitalize }} waste">{{ "%g"|format(record.quantity_kg) }} kg<span class="visually-hidden"> ({{ record.band }})</span></span></td>
+          <td class="numeric">{% if record.can_edit %}<a class="text-link" href="{{ record.edit_url }}" aria-label="Edit record FW-{{ '%03d'|format(record.id) }}">Edit</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if more %}
+  <div class="see-more">
+    {% if more.remaining %}<a class="button button-secondary" href="{{ more.more_url }}">See {{ more.next_batch }} more records</a>{% endif %}
+    {% if more.shown > 5 %}<a class="text-link" href="{{ more.fewer_url }}">Show fewer</a>{% endif %}
+    <span class="see-more-status">{{ more.remaining }} older {{ 'record' if more.remaining == 1 else 'records' }} not shown</span>
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="empty-state">
+    {% if database_error %}
+      <h3>Records unavailable</h3><p>Try again after checking the local database.</p>
+    {% elif errors %}
+      <p>Fix the filter values above to see records.</p>
+    {% elif has_filters %}
+      <h3>No matching records</h3>
+      <p>No records match these filters. Try a wider date range or clear the filters.</p>
+      <a class="button button-secondary" href="{{ clear_filters_url }}">Clear filters</a>
+    {% else %}
+      <h3>No waste records yet</h3>
+      <p>Add the first waste event to start tracking.</p>
+      <a class="button button-primary" href="{{ add_url }}">+ Add waste record</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+
+{% if panel %}{% include '_record_panel.html' %}{% endif %}
+{% endblock %}

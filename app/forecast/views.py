@@ -71,6 +71,7 @@ class MealForecast(BaseModel):
 
 class HistoryPoint(BaseModel):
     date: str
+    meal_type: str
     actual: float
     predicted: float
 
@@ -156,6 +157,6 @@ def forecast_history(request: Request, db: Session = Depends(get_session)):
         return api_error("Prediction failed. Check the server logs for details.", 500)
 
     history = {food: [] for food in order}
-    for (day, _, food, _, actual), predicted in zip(points, predictions):
-        history[food].append(HistoryPoint(date=day, actual=round(actual, 2), predicted=round(float(predicted), 2)))
+    for (day, meal, food, _, actual), predicted in zip(points, predictions):
+        history[food].append(HistoryPoint(date=day, meal_type=meal, actual=round(actual, 2), predicted=round(float(predicted), 2)))
     return ForecastHistory(items=[HistoryItem(food_item=food, history=history[food]) for food in order])

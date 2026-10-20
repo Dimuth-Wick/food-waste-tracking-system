@@ -24,16 +24,30 @@ def valid_form(app):
         }
 
 
-def test_valid_submission_is_saved_and_success_is_shown(app_with_demo):
+def test_add_panel_opens_over_the_overview(app_with_demo):
+    page = client(app_with_demo).get("/records/new")
+    assert page.status_code == 200
+    html = page.text
+    assert "<h1>Waste overview</h1>" in html           # the page behind the panel
+    assert '<dialog class="record-panel"' in html
+    assert "Add waste record" in html
+    assert "Demo Kitchen Staff" in html
+    assert "Total recorded" in html                    # totals are still visible behind it
+    assert 'href="/"' in html                          # Cancel goes back to the overview
+
+
+def test_valid_submission_is_saved_and_returns_to_overview(app_with_demo):
     app = app_with_demo
     form = valid_form(app)
     response = client(app).post("/records/new", data=form)
 
     assert response.status_code == 303
-    assert "/records/new?created=" in response.headers["location"]
-    success = client(app).get(response.headers["location"])
-    assert success.status_code == 200
-    assert "saved successfully" in success.text
+    assert response.headers["location"].startswith("/?created=")
+    page = client(app).get(response.headers["location"])
+    assert page.status_code == 200
+    assert "saved successfully" in page.text
+    assert 'class="is-new"' in page.text               # the new row is highlighted
+    assert "<dialog" not in page.text                  # the panel is closed again
 
     with database(app) as db:
         row = sql(db, "SELECT * FROM waste_records ORDER BY id DESC LIMIT 1").mappings().one()
@@ -44,7 +58,17 @@ def test_valid_submission_is_saved_and_success_is_shown(app_with_demo):
         assert row["area_id"] == int(form["area_id"])
 
 
-def test_invalid_entries_show_field_errors_and_save_nothing(app_with_demo):
+def test_saving_keeps_the_filters_the_user_was_looking_at(app_with_demo):
+    app = app_with_demo
+    saved = client(app).post("/records/new?area_id=1&show=25", data=valid_form(app))
+    assert saved.status_code == 303
+    assert saved.headers["location"].startswith("/?area_id=1&created=")
+    assert "show=" not in saved.headers["location"]    # the new record is at the top of the list
+    panel = client(app).get("/records/new?area_id=1&show=25").text
+    assert 'href="/?area_id=1&amp;show=25"' in panel    # Cancel returns to the same view
+
+
+def test_invalid_entries_show_field_errors_in_the_panel_and_save_nothing(app_with_demo):
     app = app_with_demo
     browser = client(app)
     with database(app) as db:
@@ -52,6 +76,7 @@ def test_invalid_entries_show_field_errors_and_save_nothing(app_with_demo):
 
     missing = browser.post("/records/new", data={})
     assert missing.status_code == 400
+    assert '<dialog class="record-panel"' in missing.text   # the panel stays open
     assert "Enter the date and time" in missing.text
     assert "Select a source area" in missing.text
     assert "Enter the quantity in kilograms" in missing.text
@@ -64,6 +89,7 @@ def test_invalid_entries_show_field_errors_and_save_nothing(app_with_demo):
     assert "valid food category" in invalid.text
     assert "greater than zero" in invalid.text
     assert 'aria-invalid="true"' in invalid.text
+    assert 'value="-2"' in invalid.text                      # what was typed is kept
 
     bad_time = valid_form(app)
     bad_time["event_at"] = "2026-10-01"

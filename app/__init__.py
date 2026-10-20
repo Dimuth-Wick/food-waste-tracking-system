@@ -13,22 +13,22 @@ from app.config import load_settings
 from app.database.connection import create_database_engine, make_session_factory
 from app.forecast import model as forecast_model
 from app.forecast import views as forecast
-from app.vision import counting, prediction
-from app.waste_records import add_record, dashboard, edit_record, record_list
+from app.vision import counting
+from app.waste_records import add_record, edit_record, overview
 from app.web import RequestSizeLimit, install_error_handlers
 
 
 ROUTERS = (
-    dashboard.router, record_list.router, add_record.router, edit_record.router,  # waste records
+    overview.router, add_record.router, edit_record.router,                       # waste records
     forecast.router,                                                              # meal forecast
-    prediction.router, counting.router,                                           # vision
+    counting.router,                                                              # food counting
 )
 
 
 def create_app(config=None) -> FastAPI:
     settings = load_settings(config)
     app = FastAPI(
-        title="Food Waste Tracking",
+        title="Wastewise",
         summary="Hotel food waste records, meal demand forecasts and food recognition.",
         docs_url="/docs",
         redoc_url=None,

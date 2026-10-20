@@ -20,7 +20,7 @@ def _form(quantity="2.5"):
 
 
 def test_complete_record_flow_persists_after_reopening_app(tmp_path, monkeypatch):
-    monkeypatch.setattr("app.waste_records.dashboard._now_local",
+    monkeypatch.setattr("app.waste_records.overview._now_local",
                         lambda: datetime(2026, 10, 2, 15, tzinfo=DEMO_TIMEZONE))
     app = make_app(tmp_path, "review.sqlite3")
     _prepare_database(app)
@@ -29,17 +29,17 @@ def test_complete_record_flow_persists_after_reopening_app(tmp_path, monkeypatch
     assert browser.get("/").status_code == 200
     assert "Add waste record" in browser.get("/").text
     assert browser.get("/records/new").status_code == 200
+    assert browser.get("/records").status_code == 308   # old address redirects to the overview
 
     saved = browser.post("/records/new", data=_form())
     assert saved.status_code == 303
     assert "saved successfully" in browser.get(saved.headers["location"]).text
-    listing = browser.get("/records").text
-    assert "FW-001" in listing
-    assert "2.5 kg" in listing
-    assert "/records/1/edit" in listing
-    dashboard = browser.get("/").text
-    assert "2.50" in dashboard
-    assert "Buffet: 2.50 kilograms" in dashboard
+    overview = browser.get("/").text
+    assert "FW-001" in overview
+    assert "2.5 kg" in overview
+    assert "/records/1/edit" in overview
+    assert "2.50" in overview
+    assert "Buffet: 2.50 kilograms" in overview
 
     edit_form = browser.get("/records/1/edit")
     assert edit_form.status_code == 200
@@ -47,17 +47,17 @@ def test_complete_record_flow_persists_after_reopening_app(tmp_path, monkeypatch
     updated = browser.post("/records/1/edit", data=_form("4"))
     assert updated.status_code == 303
     assert "updated successfully" in browser.get(updated.headers["location"]).text
-    assert "4 kg" in browser.get("/records").text
+    assert "4 kg" in browser.get("/").text
     assert "4.00" in browser.get("/").text
 
     invalid = browser.post("/records/1/edit", data=_form("0"))
     assert invalid.status_code == 400
     assert "greater than zero" in invalid.text
-    assert "4 kg" in browser.get("/records").text
+    assert "4 kg" in browser.get("/").text
     assert browser.post("/records/new", data={}).status_code == 400
 
     reopened = client(make_app(tmp_path, "review.sqlite3", initialize=False))
-    assert "FW-001" in reopened.get("/records").text
+    assert "FW-001" in reopened.get("/").text
     assert "4.00" in reopened.get("/").text
     with database(app) as db:
         record = get_waste_record(db, 1)
@@ -77,13 +77,13 @@ def test_oversized_identifiers_return_validation_errors(tmp_path):
     assert response.status_code == 400
     assert "Select a valid source area" in response.text
 
-    filtered = browser.get("/records?category_id=" + too_long)
+    filtered = browser.get("/?category_id=" + too_long)
     assert filtered.status_code == 400
     assert "Select a valid category" in filtered.text
 
-    dashboard = browser.get("/?reason_id=" + too_long)
-    assert dashboard.status_code == 400
-    assert "Select a valid reason" in dashboard.text
+    overview = browser.get("/?reason_id=" + too_long)
+    assert overview.status_code == 400
+    assert "Select a valid reason" in overview.text
 
     assert browser.get("/records/new?created=" + too_long).status_code == 200
     assert browser.get("/records/99999999999999999999/edit").status_code == 404
@@ -91,7 +91,7 @@ def test_oversized_identifiers_return_validation_errors(tmp_path):
 
 def test_uninitialized_database_shows_service_error_instead_of_crashing(tmp_path):
     browser = client(make_app(tmp_path, "not_initialized.sqlite3", initialize=False))
-    for path in ("/", "/records", "/records/new", "/records/1/edit"):
+    for path in ("/", "/records/new", "/records/1/edit"):
         response = browser.get(path)
         assert response.status_code == 503
         assert "Traceback" not in response.text

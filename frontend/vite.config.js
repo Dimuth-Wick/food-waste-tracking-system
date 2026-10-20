@@ -19,7 +19,6 @@ export default defineConfig({
       input: {
         counting: source("./src/counting/main.jsx"),
         forecast: source("./src/forecast/main.jsx"),
-        prediction: source("./src/prediction/main.jsx"),
       },
       output: {
         entryFileNames: "[name].js",

@@ -1,4 +1,8 @@
-"""Add waste record page: the entry form and saving a new record."""
+"""Add waste record: a side panel over the waste overview.
+
+/records/new opens the overview with the panel showing, so kitchen staff can
+bookmark it. Saving returns to the overview with the new record highlighted.
+"""
 
 from datetime import datetime
 from math import isfinite
@@ -11,9 +15,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_session
-from app.database.queries import create_waste_record, get_user_by_username, get_waste_record
+from app.database.queries import create_waste_record, get_user_by_username
 from app.waste_records.common import DEMO_TIMEZONE, DEMO_USERNAME, load_lookups, parse_id
-from app.web import render, url_path
+from app.waste_records.overview import render_overview, view_state
+from app.web import url_path
 
 
 logger = logging.getLogger(__name__)
@@ -31,16 +36,17 @@ class RecordForm:
             FIELD_NAMES, (event_at, area_id, category_id, reason_id, quantity_kg))}
 
 
-def render_form(request: Request, *, areas, categories, reasons, actor_name, values=None,
-                errors=None, message=None, saved_record=None, status_code=200,
-                editing=False, record_id=None):
-    return render(
-        request, "new_record.html", status_code,
-        active_page="records" if editing else "new_record",
-        areas=areas, categories=categories, reasons=reasons, actor_name=actor_name,
-        values=values or {}, errors=errors or {}, message=message,
-        saved_record=saved_record, editing=editing, record_id=record_id,
-    )
+def render_panel(request: Request, db: Session, *, lookups, actor_name, values=None,
+                 errors=None, message=None, status_code=200, record_id=None):
+    """The overview with the add panel (or, given record_id, the edit panel) open."""
+    panel = {
+        "editing": record_id is not None, "record_id": record_id,
+        "areas": lookups.get("areas", []), "categories": lookups.get("categories", []),
+        "reasons": lookups.get("reasons", []), "actor_name": actor_name,
+        "values": values or {}, "errors": errors or {}, "message": message,
+        "close_url": url_path(request.app, "dashboard", **view_state(request)),
+    }
+    return render_overview(request, db, panel=panel, status_code=status_code)
 
 
 def parse_form(values, lookups):
@@ -93,39 +99,32 @@ def parse_form(values, lookups):
 def _load(request: Request, db: Session, values):
     """Load the form's choices and demo user.
 
-    Returns ((lookups, actor, form context), None), or (None, error page).
+    Returns ((lookups, actor), None), or (None, the overview with an error in the panel).
     """
     try:
         lookups = load_lookups(db, active_only=True)
         actor = get_user_by_username(db, DEMO_USERNAME)
     except SQLAlchemyError:
         logger.exception("Could not load the waste entry form")
-        return None, render_form(
-            request, areas=[], categories=[], reasons=[], actor_name=None,
-            message="The database is unavailable. Initialize it and try again.", status_code=503,
-        )
-    context = {**lookups, "actor_name": actor.name if actor else None, "values": values}
+        return None, render_panel(request, db, lookups={}, actor_name=None, values=values,
+                                  status_code=503,
+                                  message="The database is unavailable. Initialize it and try again.")
     if actor is None or not actor.active or actor.role != "entry" or not all(lookups.values()):
-        return None, render_form(
-            request, **context, status_code=503,
+        return None, render_panel(
+            request, db, lookups=lookups, actor_name=actor.name if actor else None,
+            values=values, status_code=503,
             message="Demo entry data is missing. Initialize and seed the local database first.",
         )
-    return (lookups, actor, context), None
+    return (lookups, actor), None
 
 
 @router.get("/records/new", name="new_record")
-def new_record_page(request: Request, created: str = "", db: Session = Depends(get_session)):
-    loaded, error_page = _load(request, db, {name: "" for name in FIELD_NAMES})
+def new_record_panel(request: Request, db: Session = Depends(get_session)):
+    loaded, error_page = _load(request, db, {})
     if error_page:
         return error_page
-    _, _, context = loaded
-    saved_record = None
-    if (created_id := parse_id(created)) is not None:
-        try:
-            saved_record = get_waste_record(db, created_id)
-        except SQLAlchemyError:
-            logger.exception("Could not read saved waste record")
-    return render_form(request, **context, saved_record=saved_record)
+    lookups, actor = loaded
+    return render_panel(request, db, lookups=lookups, actor_name=actor.name)
 
 
 @router.post("/records/new", name="save_new_record")
@@ -134,16 +133,19 @@ def save_new_record(request: Request, form: RecordForm = Depends(),
     loaded, error_page = _load(request, db, form.values)
     if error_page:
         return error_page
-    lookups, actor, context = loaded
+    lookups, actor = loaded
 
     errors, event_at, selected_ids, quantity_kg = parse_form(form.values, lookups)
     if errors:
-        return render_form(request, **context, errors=errors, status_code=400)
+        return render_panel(request, db, lookups=lookups, actor_name=actor.name,
+                            values=form.values, errors=errors, status_code=400)
     try:
         record = create_waste_record(db, event_at=event_at, quantity_kg=quantity_kg,
                                      user_id=actor.id, **selected_ids)
     except (SQLAlchemyError, ValueError):
         logger.exception("Could not save waste record")
-        return render_form(request, **context, status_code=500,
-                           message="The record could not be saved. Check the details and try again.")
-    return RedirectResponse(url_path(request.app, "new_record", created=record.id), status_code=303)
+        return render_panel(request, db, lookups=lookups, actor_name=actor.name,
+                            values=form.values, status_code=500,
+                            message="The record could not be saved. Check the details and try again.")
+    state = {key: value for key, value in view_state(request).items() if key != "show"}
+    return RedirectResponse(url_path(request.app, "dashboard", **state, created=record.id), status_code=303)

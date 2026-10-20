@@ -1,5 +1,5 @@
 <section class="panel filter-panel" aria-label="Filters">
-  <form method="get" class="filter-form" novalidate>
+  <form method="get" action="{{ url_for('dashboard') }}" class="filter-form" novalidate>
     {% for field, label in [('start_date', 'From date'), ('end_date', 'To date')] %}
     <div class="form-field">
       <label for="{{ field }}">{{ label }}</label>

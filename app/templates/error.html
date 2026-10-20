@@ -10,9 +10,8 @@
 <section class="sheet">
   <div class="empty-state">
     <h3>Error {{ status }}</h3>
-    <p>Go back to the dashboard or the list of waste records.</p>
-    <a class="button button-primary" href="{{ url_for('dashboard') }}">Open the dashboard</a>
-    <a class="button button-secondary" href="{{ url_for('records') }}">View records</a>
+    <p>Go back to the waste overview to see the totals and records.</p>
+    <a class="button button-primary" href="{{ url_for('dashboard') }}">Open the waste overview</a>
   </div>
 </section>
 {% endblock %}

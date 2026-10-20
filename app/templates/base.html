@@ -3,29 +3,26 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#173b34">
-    <title>{% block title %}{% endblock %} · Food Waste Tracking</title>
+    <meta name="theme-color" content="#064e3b">
+    <title>{% block title %}{% endblock %} · Wastewise</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     {% block head %}{% endblock %}
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Application navigation">
-        <a class="brand" href="{{ url_for('dashboard') }}" aria-label="Food Waste Tracking dashboard">
+        <a class="brand" href="{{ url_for('dashboard') }}" aria-label="Wastewise waste overview">
           <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
-          <span><strong>Food Waste</strong><small>Tracking system</small></span>
+          <span><strong>Wastewise</strong><small>Hotel kitchen insights</small></span>
         </a>
         <nav class="main-nav" aria-label="Main navigation">
           <p class="nav-group-label" id="nav-tracking">Waste tracking</p>
           <ul aria-labelledby="nav-tracking">
-            <li><a href="{{ url_for('dashboard') }}" {% if active_page == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a></li>
-            <li><a href="{{ url_for('records') }}" {% if active_page == 'records' %}aria-current="page"{% endif %}>Waste records</a></li>
-            <li><a href="{{ url_for('new_record') }}" {% if active_page == 'new_record' %}aria-current="page"{% endif %}>Add waste record</a></li>
+            <li><a href="{{ url_for('dashboard') }}" {% if active_page == 'dashboard' %}aria-current="page"{% endif %}>Waste overview</a></li>
           </ul>
           <p class="nav-group-label" id="nav-models">Prediction tools</p>
           <ul aria-labelledby="nav-models">
             <li><a href="{{ url_for('forecast') }}" {% if active_page == 'forecast' %}aria-current="page"{% endif %}>Meal forecast</a></li>
-            <li><a href="{{ url_for('food_prediction') }}" {% if active_page == 'food_prediction' %}aria-current="page"{% endif %}>Food image prediction</a></li>
             <li><a href="{{ url_for('food_counting') }}" {% if active_page == 'food_counting' %}aria-current="page"{% endif %}>Food counting</a></li>
           </ul>
         </nav>

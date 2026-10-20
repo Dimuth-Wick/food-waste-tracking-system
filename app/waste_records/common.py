@@ -82,7 +82,18 @@ def parse_filters(values: dict[str, str], lookups) -> tuple[dict[str, str], Reco
     )
 
 
+# Weight bands used to colour the records table: green, amber, red.
+MODERATE_KG = 2
+HEAVY_KG = 5
+
+
+def weight_band(quantity_kg: float) -> str:
+    """"light", "moderate" or "heavy", so heavy waste stands out at a glance."""
+    return "heavy" if quantity_kg >= HEAVY_KG else "moderate" if quantity_kg >= MODERATE_KG else "light"
+
+
 def display_row(row: dict) -> dict:
     """Add Sri Lanka date and time strings to a record row for templates."""
     moment = local_time(row["event_at"])
-    return {**row, "date": moment.strftime("%d %b %Y"), "time": moment.strftime("%H:%M")}
+    return {**row, "date": moment.strftime("%d %b %Y"), "time": moment.strftime("%H:%M"),
+            "band": weight_band(row["quantity_kg"])}

@@ -23,13 +23,13 @@
   cursor: pointer;
   transition: border-color .15s, background-color .15s;
 }
-.photo-drop:hover, .photo-drop.is-dragging { border-color: var(--brass); background: var(--pine-raised); }
-.photo-drop:focus-within { border-color: var(--brass); outline: 3px solid #2b9371; outline-offset: 3px; }
+.photo-drop:hover, .photo-drop.is-dragging { border-color: var(--accent); background: var(--pine-raised); }
+.photo-drop:focus-within { border-color: var(--accent); outline: 3px solid #ff7a1a; outline-offset: 3px; }
 .photo-drop-file { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.photo-drop-icon { width: 92px; margin-bottom: 14px; fill: none; stroke: var(--brass); stroke-width: 2.5; }
+.photo-drop-icon { width: 92px; margin-bottom: 14px; fill: none; stroke: var(--accent); stroke-width: 2.5; }
 .photo-drop-title { color: #fff; font-size: 1.3rem; font-weight: 750; letter-spacing: -.02em; }
 .photo-drop-text { color: var(--pine-text); }
-.photo-drop-browse { color: #fff; text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 3px; }
+.photo-drop-browse { color: #fff; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
 .photo-drop-note { margin-top: 18px; color: var(--pine-muted); font-size: .84rem; }
 
 /* A side column of controls and results next to a stage. */
@@ -39,7 +39,7 @@
   border-radius: 16px;
   background: var(--sheet);
 }
-.field-label { color: #2e4e3e; font-size: .88rem; font-weight: 700; }
+.field-label { color: #1f3d33; font-size: .88rem; font-weight: 700; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip {
   padding: 5px 11px;
@@ -61,7 +61,7 @@
   font-size: 1rem;
   font-weight: 750;
   cursor: pointer;
-  box-shadow: 0 3px 8px rgba(19, 88, 68, .16);
+  box-shadow: 0 3px 8px rgba(8, 127, 76, .16);
 }
 .wide-button:hover:not(:disabled) { background: var(--leaf-dark); }
 .wide-button:disabled { background: #7fa392; cursor: progress; }
@@ -93,8 +93,8 @@
   position: absolute;
   inset: 0 0 auto;
   height: 3px;
-  background: var(--brass);
-  box-shadow: 0 0 18px 4px rgba(184, 146, 79, .55);
+  background: var(--accent);
+  box-shadow: 0 0 18px 4px rgba(255, 122, 26, .55);
   animation: scan 1.6s ease-in-out infinite alternate;
 }
 @keyframes scan { from { top: 0; } to { top: calc(100% - 3px); } }
@@ -104,7 +104,7 @@
   margin: 0;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(23, 59, 52, .85);
+  background: rgba(6, 78, 59, .85);
   color: #fff;
   font-size: .84rem;
   font-weight: 650;

@@ -29,18 +29,18 @@ def form_for(app, *, quantity="3.5"):
 def test_edit_prefills_and_persists_changes(app_with_demo):
     app = app_with_demo
     browser = client(app)
-    created = browser.post("/records/new", data=form_for(app))
-    assert created.status_code == 303
+    assert browser.post("/records/new", data=form_for(app)).status_code == 303
     with database(app) as db:
         record_id = scalar(db, "SELECT MAX(id) FROM waste_records")
         original = get_waste_record(db, record_id)
         sql(db, "UPDATE waste_records SET updated_at = '2020-01-01T00:00:00.000Z' WHERE id = :id", id=record_id)
         db.commit()
 
-    assert f"/records/{record_id}/edit" in browser.get("/records").text
+    assert f"/records/{record_id}/edit" in browser.get("/").text   # the Edit link is in the table
     edit_page = browser.get(f"/records/{record_id}/edit")
     assert edit_page.status_code == 200
     assert "Edit waste record" in edit_page.text
+    assert '<dialog class="record-panel"' in edit_page.text
     assert 'value="2026-10-02T15:45"' in edit_page.text
     assert 'value="3.5"' in edit_page.text
 
@@ -48,7 +48,10 @@ def test_edit_prefills_and_persists_changes(app_with_demo):
     changed["event_at"] = "2026-10-03T09:00"
     response = browser.post(f"/records/{record_id}/edit", data=changed)
     assert response.status_code == 303
-    assert "updated successfully" in browser.get(response.headers["location"]).text
+    assert response.headers["location"] == f"/?updated={record_id}"
+    after = browser.get(response.headers["location"]).text
+    assert "updated successfully" in after
+    assert "4.25 kg" in after
     with database(app) as db:
         saved = get_waste_record(db, record_id)
         assert saved.quantity_kg == 4.25
@@ -56,7 +59,6 @@ def test_edit_prefills_and_persists_changes(app_with_demo):
         assert saved.user_id == original.user_id
         assert saved.created_at == original.created_at
         assert saved.updated_at != "2020-01-01T00:00:00.000Z"
-    assert "4.25 kg" in browser.get("/records").text
 
 
 def test_invalid_edit_does_not_change_record(app_with_demo):
@@ -71,6 +73,7 @@ def test_invalid_edit_does_not_change_record(app_with_demo):
     assert response.status_code == 400
     assert "greater than zero" in response.text
     assert "valid food category" in response.text
+    assert '<dialog class="record-panel"' in response.text
     with database(app) as db:
         assert get_waste_record(db, record_id) == before
 
@@ -91,7 +94,7 @@ def test_only_owner_can_edit_in_demo(app_with_demo):
     assert forbidden.status_code == 403
     assert "can only edit records they created" in forbidden.text
     assert browser.post(f"/records/{record.id}/edit", data=form_for(app)).status_code == 403
-    assert f"/records/{record.id}/edit" not in browser.get("/records").text
+    assert f"/records/{record.id}/edit" not in browser.get("/").text
     with database(app) as db:
         assert get_waste_record(db, record.id) == record
     missing = browser.get("/records/999999/edit")

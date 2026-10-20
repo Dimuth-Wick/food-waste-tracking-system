@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory=Path(__file__).with_name("templates"))
+STATIC_DIR = Path(__file__).with_name("static")
 MAX_REQUEST_BYTES = 9 * 1024 * 1024  # an 8 MB photo plus form overhead
 
 
@@ -34,6 +35,11 @@ def url_path(app: FastAPI, name: str, **params) -> str:
     """
     if name == "static" and "filename" in params:
         params["path"] = params.pop("filename")
+        # Version by modified time so browsers never keep serving an outdated stylesheet or script.
+        try:
+            params["v"] = int((STATIC_DIR / params["path"]).stat().st_mtime)
+        except OSError:
+            pass
     route = next((route for route in _all_routes(app.router.routes) if getattr(route, "name", None) == name), None)
     path_names = set(getattr(route, "param_convertors", {}) or {})
     path = app.url_path_for(name, **{key: value for key, value in params.items() if key in path_names})

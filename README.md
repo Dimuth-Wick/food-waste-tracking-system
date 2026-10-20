@@ -1,4 +1,4 @@
-# 🍽️ Hotel Food Waste Tracking & Forecasting System
+# 🍽️ Wastewise: Hotel Food Waste Tracking & Forecasting
 
 **An intelligent food waste management and consumption forecasting web application for large-scale hotels.**
 
@@ -127,12 +127,6 @@ On Windows PowerShell, create a virtual environment with `py -3.12 -m venv .venv
 
 The JSON APIs used by the React pages are documented, and can be tried out, at <http://127.0.0.1:5000/docs>.
 
-## Temporary Food-101 image prediction
-
-Open <http://127.0.0.1:5000/food-prediction> and upload one food image (up to 8 MB). The page displays the three most likely Food-101 labels and their model confidence. The supplied `ml_models/food101_mobilenetv2.keras` is loaded on the first prediction. The existing forecasting model and waste-record pages continue to use their existing routes.
-
-Inference uses RGB pixels, `tf.image.resize(image, (224, 224))`, and `tf.keras.applications.mobilenet_v2.preprocess_input`, matching the training code. `app/food101_labels.txt` contains the ordered class names from TensorFlow Datasets' Food-101 label file. This model classifies the whole image among 101 foods; it does not locate multiple items, read CCTV, or estimate kilograms. Uploaded images and predictions are not saved to the database.
-
 ## Food item counting (OWLv2)
 
 Open <http://127.0.0.1:5000/food-counting> (**Food counting** in the sidebar). Drop, paste (Ctrl+V) or browse for a photo, type what to count, such as `cupcake`, `egg` or `bread roll`, and press **Count**. A numbered pin drops onto each item the model finds while the total and its tally build up. You can then:
@@ -152,10 +146,9 @@ Three pages are React apps mounted inside the server-rendered layout. Their sour
 | Page | Source | JSON API it calls |
 |---|---|---|
 | Meal forecast | `frontend/src/forecast/` | `POST /api/predict-meal`, `GET /api/forecast-history` |
-| Food image prediction | `frontend/src/prediction/` | `POST /api/food-predict` |
 | Food counting | `frontend/src/counting/` | `POST /api/food-count` |
 
-The dashboard, records and record form are Jinja templates rendered by FastAPI. All pages share the colours and layout in `app/static/styles.css`: white sheets hold what people enter, and dark pine panels hold what the system answers.
+The **Waste overview** is a Jinja template rendered by FastAPI. It combines the filters, totals, breakdowns and the full record table on one page; **Add waste record** and **Edit** open as a side panel over it. Old `/records` links redirect to the overview, and `/records/new` opens the overview with the add panel showing, so kitchen staff can bookmark it. All pages share the colours and layout in `app/static/styles.css`: white sheets hold what people enter, and dark pine panels hold what the system answers.
 
 The built files are committed in `app/static/react/`, so `python run.py` works without Node.js. To change the React code, install [Node.js](https://nodejs.org/), then:
 
@@ -167,13 +160,13 @@ npm run watch   # rebuilds app/static/react on every save; refresh the browser
 
 Run `npm run build` once before committing so the committed files match the source.
 
-To see the forecast history chart with sample data, run `python scripts/seed_demo_history.py`. It adds demo records, marked as demo data, to `instance/food_waste.sqlite3`.
+To see the forecast history chart with sample data, run `python scripts/seed_demo_history.py`. It adds demo records, marked as demo data, to your real database (`instance/food_waste.sqlite3`); run it with `--remove` to take them out again.
 
 Run tests with `.venv\Scripts\python.exe -m pip install -r requirements-dev.txt` and `.venv\Scripts\python.exe -m pytest -q --basetemp .pytest-run`.
 
 ## 🗄️ Database
 
-The app uses SQLAlchemy, so it runs on the local SQLite file by default and on PostgreSQL by changing one setting. Large record lists are split into pages of 50, and dashboard totals are added up by the database.
+The app uses SQLAlchemy, so it runs on the local SQLite file by default and on PostgreSQL by changing one setting. Large record lists are split into pages of 50, and the overview's totals are added up by the database.
 
 | Setting | Default | Example |
 |---|---|---|
@@ -202,14 +195,14 @@ food-waste-tracking-system/
 │   ├── config.py           Settings, such as DATABASE_URL
 │   ├── web.py              Shared page helpers: templates, URLs, error pages, upload size limit
 │   ├── database/           Tables (SQLAlchemy), connection, queries and demo seed data
-│   ├── waste_records/      Dashboard, Waste records, Add and Edit record pages
+│   ├── waste_records/      Waste overview page, and the Add and Edit record side panels
 │   ├── forecast/           Meal forecast page, its JSON APIs and the forecast model loader
-│   ├── vision/             Food image prediction and Food counting pages, shared upload checks
+│   ├── vision/             Food counting page, shared upload checks
 │   ├── templates/          HTML for the server-rendered pages and the shared layout
 │   └── static/             styles.css for every page; react/ holds the built React pages
 ├── frontend/               React source for three pages (Node.js only needed to change them)
-│   └── src/                forecast/, prediction/, counting/ and shared/
-├── ml_models/              Trained model files: forecast (.pkl) and Food-101 classifier (.keras)
+│   └── src/                forecast/, counting/ and shared/
+├── ml_models/              Trained model files: forecast (.pkl); the unused Food-101 classifier (.keras) is kept
 ├── scripts/                init_db.py (create tables, demo data) and seed_demo_history.py
 └── tests/                  pytest tests, one file per feature
 ```
@@ -217,8 +210,8 @@ food-waste-tracking-system/
 Where to start:
 
 - **Change a page's URL or add a page:** the `@router.get` / `@router.post` line above the view in its feature folder. A new feature's `router` is added to `ROUTERS` in `app/__init__.py`.
-- **Change the dashboard, records or record form:** `app/waste_records/` and `app/templates/`.
-- **Change the forecast, prediction or counting page:** the Python view in `app/forecast/` or `app/vision/`, and the matching React folder in `frontend/src/`. Then run `npm run build` in `frontend/`.
+- **Change the waste overview or the record form:** `app/waste_records/` (`overview.py`, `add_record.py`, `edit_record.py`) and `app/templates/` (`overview.html`, `_record_panel.html`).
+- **Change the forecast or counting page:** the Python view in `app/forecast/` or `app/vision/`, and the matching React folder in `frontend/src/`. Then run `npm run build` in `frontend/`.
 - **Change colours or layout used everywhere:** `app/static/styles.css`.
 
 ## 🗺️ Development Roadmap

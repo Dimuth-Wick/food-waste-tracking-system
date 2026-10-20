@@ -59,7 +59,7 @@ def test_food_counting_page_mounts_react_app(tmp_path):
 
 def test_react_bundles_are_built():
     react = Path(counting.__file__).resolve().parents[1] / "static" / "react"
-    for name in ["counting.js", "forecast.js", "prediction.js", "react.css"]:
+    for name in ["counting.js", "forecast.js", "react.css"]:
         assert (react / name).is_file(), f"Run npm run build in frontend/ ({name} missing)"
 
 
