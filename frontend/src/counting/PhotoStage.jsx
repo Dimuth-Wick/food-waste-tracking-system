@@ -4,13 +4,14 @@ const percent = (value, total) => `${(value / total) * 100}%`;
 
 export default function PhotoStage({
   photo, counting, detections, result, removed, active, onActive, onToggle, onPhoto,
+  title = "Drop a photo of the tray here",
 }) {
   const [dragging, dropHandlers] = useDropTarget(onPhoto);
 
   if (!photo) {
     return (
       <PhotoDrop
-        title="Drop a photo of the tray here"
+        title={title}
         note="Shoot from above, with items not stacked. Up to 8 MB."
         onImage={onPhoto}
       />

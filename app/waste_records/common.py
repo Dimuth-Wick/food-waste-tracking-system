@@ -1,5 +1,6 @@
 """Helpers shared by the dashboard, records list and record forms."""
 
+import json
 from datetime import date, datetime, time, timedelta, timezone
 import re
 
@@ -93,8 +94,39 @@ def weight_band(quantity_kg: float, reason: str | None = None) -> str:
     return "heavy" if quantity_kg >= HEAVY_KG else "moderate" if quantity_kg >= MODERATE_KG else "light"
 
 
+def photo_detail(notes: str) -> str | None:
+    """A short description for records saved from buffet photos, such as "Bread: 2 of 14 left"."""
+    try:
+        data = json.loads(notes or "")
+    except ValueError:
+        return None
+    if not isinstance(data, dict) or data.get("source") != "photo count":
+        return None
+    if "short" in data:
+        return f"{data.get('item', 'Food')}: {data['short']} pieces short"
+    return f"{data.get('item', 'Food')}: {data.get('end')} of {data.get('start')} left"
+
+
+MEALS = ("Breakfast", "Lunch", "Dinner")
+
+
+def meal_for(moment: datetime, notes: str = "") -> str:
+    """The meal a record belongs to: from its notes when saved with one, otherwise from the time."""
+    try:
+        data = json.loads(notes or "")
+    except ValueError:
+        data = None
+    if isinstance(data, dict):
+        for key in ("meal", "meal_type"):
+            if data.get(key) in MEALS:
+                return data[key]
+    return "Breakfast" if moment.hour < 11 else "Lunch" if moment.hour < 16 else "Dinner"
+
+
 def display_row(row: dict) -> dict:
     """Add Sri Lanka date and time strings to a record row for templates."""
     moment = local_time(row["event_at"])
     return {**row, "date": moment.strftime("%d %b %Y"), "time": moment.strftime("%H:%M"),
-            "band": weight_band(row["quantity_kg"], row.get("reason"))}
+            "day": moment.date().isoformat(), "meal": meal_for(moment, row.get("notes", "")),
+            "band": weight_band(row["quantity_kg"], row.get("reason")),
+            "photo": photo_detail(row.get("notes", ""))}

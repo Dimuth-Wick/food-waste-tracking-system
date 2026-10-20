@@ -41,12 +41,13 @@ def test_valid_submission_is_saved_and_returns_to_overview(app_with_demo):
     response = client(app).post("/records/new", data=form)
 
     assert response.status_code == 303
-    assert response.headers["location"].startswith("/?created=")
+    assert response.headers["location"].startswith("/days/2026-10-01?created=")
     page = client(app).get(response.headers["location"])
     assert page.status_code == 200
     assert "saved successfully" in page.text
-    assert 'class="is-new"' in page.text               # the new row is highlighted
-    assert "<dialog" not in page.text                  # the panel is closed again
+    assert "day-item is-new" in page.text               # the new row is highlighted
+    assert '<dialog class="record-panel" ' not in page.text   # the add panel is closed
+    assert "<h1>01 Oct 2026</h1>" in page.text and "day-item is-new" in page.text  # the day's page shows it
 
     with database(app) as db:
         row = sql(db, "SELECT * FROM waste_records ORDER BY id DESC LIMIT 1").mappings().one()
@@ -61,7 +62,7 @@ def test_saving_keeps_the_filters_the_user_was_looking_at(app_with_demo):
     app = app_with_demo
     saved = client(app).post("/records/new?area_id=1&show=25", data=valid_form(app))
     assert saved.status_code == 303
-    assert saved.headers["location"].startswith("/?area_id=1&created=")
+    assert saved.headers["location"].startswith("/days/2026-10-01?area_id=1&created=")
     assert "show=" not in saved.headers["location"]    # the new record is at the top of the list
     panel = client(app).get("/records/new?area_id=1&show=25").text
     assert 'href="/?area_id=1&amp;show=25"' in panel    # Cancel returns to the same view

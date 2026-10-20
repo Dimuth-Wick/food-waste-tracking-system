@@ -22,6 +22,7 @@ from pathlib import Path
 
 # The app's database, found from this file so the script works from any folder.
 DAYS = 30   # days of history per food item
+MEAL_END_UTC = {"Breakfast": "04:30", "Lunch": "09:30", "Dinner": "16:30"}
 
 DB_PATH = Path(__file__).resolve().parent.parent / "instance" / "food_waste.sqlite3"
 
@@ -84,9 +85,10 @@ def generate_demo_data():
             # Advance date by 1 day per record
             record_date = base_date + datetime.timedelta(days=i)
             # Create a realistic timestamp
-            event_at = f"{record_date.isoformat()}T12:00:00Z"
             
             meal_type = random.choice(item["meal_types"])
+            # End of that meal in Sri Lanka time (UTC+5:30): 10:00, 15:00 or 22:00.
+            event_at = f"{record_date.isoformat()}T{MEAL_END_UTC[meal_type]}:00Z"
             guest_count = random.randint(80, 200)
             
             # Create realistic consumed quantity + a small random variance

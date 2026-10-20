@@ -16,7 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_session
-from app.database.queries import list_record_notes
+from app.database.queries import list_meal_checks, list_record_notes
 from app.forecast.model import get_model
 from app.web import api_error, render, url_path
 
@@ -126,9 +126,11 @@ def predict_meal(request: Request, meal: MealRequest):
 @router.get("/api/forecast-history", name="forecast_history", response_model=ForecastHistory,
             summary="Past consumption compared with the model's forecast")
 def forecast_history(request: Request, db: Session = Depends(get_session)):
-    """Uses records whose notes hold meal_type, food_item, guest_count and consumed_quantity."""
+    """Uses meal checks counted from photos, and records whose notes hold meal_type, food_item,
+    guest_count and consumed_quantity. The most recently served food items come first."""
     try:
         rows = list_record_notes(db, limit=HISTORY_RECORDS_SCANNED)
+        checks = list_meal_checks(db, limit=HISTORY_RECORDS_SCANNED)
     except SQLAlchemyError:
         logger.exception("Could not read forecast history")
         return api_error("The database is unavailable.", 503)
@@ -144,8 +146,12 @@ def forecast_history(request: Request, db: Session = Depends(get_session)):
         if None in (meal, food):
             continue
         points.append((event_at.split("T")[0], meal, food, guests, actual))
+    for check in checks:
+        points.append((check.event_at.split("T")[0], check.meal_type, check.food_item,
+                       float(check.guest_count), check.eaten_kg))
+    points.sort(key=lambda point: point[0])
 
-    order = list(dict.fromkeys(food for _, _, food, _, _ in points))[:HISTORY_ITEMS]
+    order = list(dict.fromkeys(food for _, _, food, _, _ in reversed(points)))[:HISTORY_ITEMS]
     points = [point for point in points if point[2] in order]
     if not points:
         return ForecastHistory(items=[])

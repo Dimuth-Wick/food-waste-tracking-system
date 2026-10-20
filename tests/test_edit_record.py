@@ -35,7 +35,7 @@ def test_edit_prefills_and_persists_changes(app_with_demo):
         sql(db, "UPDATE waste_records SET updated_at = '2020-01-01T00:00:00.000Z' WHERE id = :id", id=record_id)
         db.commit()
 
-    assert f"/records/{record_id}/edit" in browser.get("/").text   # the Edit link is in the table
+    assert f"/records/{record_id}/edit" in browser.get("/days/2026-10-02").text   # the Edit link is in the day's details
     edit_page = browser.get(f"/records/{record_id}/edit")
     assert edit_page.status_code == 200
     assert "Edit waste record" in edit_page.text
@@ -47,7 +47,7 @@ def test_edit_prefills_and_persists_changes(app_with_demo):
     changed["event_at"] = "2026-10-03T09:00"
     response = browser.post(f"/records/{record_id}/edit", data=changed)
     assert response.status_code == 303
-    assert response.headers["location"] == f"/?updated={record_id}"
+    assert response.headers["location"] == f"/days/2026-10-03?updated={record_id}"
     after = browser.get(response.headers["location"]).text
     assert "updated successfully" in after
     assert "4.25 kg" in after

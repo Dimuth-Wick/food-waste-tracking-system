@@ -8,8 +8,12 @@ list of classes, so it can count items it was never fine-tuned on.
 import logging
 import re
 
-from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.database.connection import get_session
+from app.vision.meal_check import meal_check_settings
 
 from app.vision.uploads import UploadError, read_uploaded_image
 from app.web import api_error, render, url_path
@@ -130,14 +134,15 @@ class FoodCount(BaseModel):
 
 
 @router.get("/food-counting", name="food_counting", include_in_schema=False)
-def food_counting(request: Request):
+def food_counting(request: Request, db: Session = Depends(get_session)):
+
     return render(
         request, "_react_page.html",
         react_page="counting",
         active_page="food_counting",
         heading="Food counting",
-        description=("Add a photo, type what to count, and check each item the model "
-                     "pins. Counts are not saved as waste records."),
+        description=("Count the buffet at the start and at the end of a meal. The pieces left "
+                     "over are saved as waste, and what was eaten updates the meal forecast."),
         settings={
             "apiUrl": url_path(request.app, "count_food"),
             "defaultItem": DEFAULT_ITEM,
@@ -145,6 +150,7 @@ def food_counting(request: Request):
             "maxItemLength": MAX_ITEM_LENGTH,
             "minConfidence": MIN_CONFIDENCE,
             "defaultConfidence": DEFAULT_CONFIDENCE,
+            "mealCheck": meal_check_settings(request, db),
         },
     )
 

@@ -35,9 +35,9 @@ def test_complete_record_flow_persists_after_reopening_app(tmp_path, monkeypatch
     assert saved.status_code == 303
     assert "saved successfully" in browser.get(saved.headers["location"]).text
     overview = browser.get("/").text
-    assert "FW-001" in overview
-    assert "2.5 kg" in overview
-    assert "/records/1/edit" in overview
+    assert "02 Oct 2026" in overview                       # one row for the day
+    day = browser.get("/days/2026-10-02").text
+    assert "FW-001" in day and "2.5 kg" in day and "/records/1/edit" in day
     assert "2.50" in overview
     assert "Buffet: 2.50 kilograms" in overview
 
@@ -47,17 +47,17 @@ def test_complete_record_flow_persists_after_reopening_app(tmp_path, monkeypatch
     updated = browser.post("/records/1/edit", data=_form("4"))
     assert updated.status_code == 303
     assert "updated successfully" in browser.get(updated.headers["location"]).text
-    assert "4 kg" in browser.get("/").text
+    assert "4 kg" in browser.get("/days/2026-10-02").text
     assert "4.00" in browser.get("/").text
 
     invalid = browser.post("/records/1/edit", data=_form("0"))
     assert invalid.status_code == 400
     assert "greater than zero" in invalid.text
-    assert "4 kg" in browser.get("/").text
+    assert "4 kg" in browser.get("/days/2026-10-02").text
     assert browser.post("/records/new", data={}).status_code == 400
 
     reopened = client(make_app(tmp_path, "review.sqlite3", initialize=False))
-    assert "FW-001" in reopened.get("/").text
+    assert "FW-001" in reopened.get("/days/2026-10-02").text
     assert "4.00" in reopened.get("/").text
     with database(app) as db:
         record = get_waste_record(db, 1)

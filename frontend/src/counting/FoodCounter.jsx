@@ -7,9 +7,10 @@ import { plural, prefersReducedMotion } from "../shared/text.js";
 
 const PIN_DELAY_MS = 160;
 
-export default function FoodCounter({ settings }) {
+// One photo's count. The meal check page shows two: the start and the end of the meal.
+// The item being counted is shared between them, and each reports its count upward.
+export default function FoodCounter({ settings, slot, onScreen, item, setItem, onCount, photoTitle, next }) {
   const [photo, setPhoto] = useState(null); // { file, url }
-  const [item, setItem] = useState(settings.defaultItem);
   const [status, setStatus] = useState("idle"); // idle | counting | done
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
@@ -57,7 +58,9 @@ export default function FoodCounter({ settings }) {
     setError("");
   }
 
-  usePastedImage(choosePhoto);
+  // Only the photo tab on screen takes a pasted image.
+  const pasteHere = useCallback((file) => { if (onScreen) choosePhoto(file); }, [onScreen, choosePhoto]);
+  usePastedImage(pasteHere);
 
   // Drop the pins in one at a time after a new result arrives.
   useEffect(() => {
@@ -127,6 +130,10 @@ export default function FoodCounter({ settings }) {
   const counting = status === "counting";
   const finished = result && revealed >= visible.length;
 
+  useEffect(() => {
+    onCount(slot, result && finished ? { count: counted, label: resultItem } : null);
+  }, [onCount, slot, result, finished, counted, resultItem]);
+
   return (
     <div className="fc">
       <PhotoStage
@@ -139,6 +146,7 @@ export default function FoodCounter({ settings }) {
         onActive={setActive}
         onToggle={toggle}
         onPhoto={choosePhoto}
+        title={photoTitle}
       />
 
       <aside className="side-panel fc-panel" aria-label="Counting controls and result">
@@ -185,6 +193,7 @@ export default function FoodCounter({ settings }) {
               <span>{plural(resultItem, counted)} counted</span>
             </h2>
             <Tally count={counted} />
+            {finished && next}
             {isStale && (
               <p className="hint">This count is for “{resultItem}”. Press Count to count {plural(cleanItem)} instead.</p>
             )}

@@ -34,7 +34,7 @@ def test_static_files_and_api_docs_are_served(tmp_path):
     assert browser.get("/static/react/forecast.js").status_code == 200
     schema = browser.get("/openapi.json").json()
     assert set(schema["paths"]) == {
-        "/api/predict-meal", "/api/forecast-history", "/api/food-count",
+        "/api/predict-meal", "/api/forecast-history", "/api/food-count", "/api/meal-checks",
     }
     assert browser.get("/docs").status_code == 200
 

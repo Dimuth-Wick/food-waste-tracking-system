@@ -15,7 +15,7 @@
 {% elif errors %}
 <div class="notice notice-error" role="alert"><strong>Check the filters.</strong>Correct the highlighted fields to see the totals and records.</div>
 {% elif notice %}
-<div class="notice notice-success" role="status"><strong>Record FW-{{ "%03d"|format(notice.record.id) }} {{ notice.verb }} successfully.</strong>It holds {{ "%g"|format(notice.record.quantity_kg) }} kg and is highlighted in the table below.</div>
+<div class="notice notice-success" role="status"><strong>Record FW-{{ "%03d"|format(notice.record.id) }} {{ notice.verb }} successfully.</strong>It holds {{ "%g"|format(notice.record.quantity_kg) }} kg and is highlighted in its day.</div>
 {% endif %}
 
 {% include '_filter_form.html' %}
@@ -82,31 +82,25 @@
 
 <section class="sheet records-panel" id="records" aria-labelledby="records-title">
   <div class="sheet-heading">
-    <h2 id="records-title">Waste records</h2>
-    {% if summary %}<span class="record-count">{% if more %}Showing {{ more.shown }} of {% endif %}{{ summary.record_count }} {{ 'record' if summary.record_count == 1 else 'records' }}</span>{% endif %}
+    <h2 id="records-title">Waste by day</h2>
+    {% if summary %}<span class="record-count">{% if more %}Showing {{ more.shown }} of {{ more.total }} days · {% endif %}{{ summary.record_count }} {{ 'record' if summary.record_count == 1 else 'records' }}</span>{% endif %}
   </div>
-  {% if records %}
-  <ul class="weight-key" aria-label="Weight colours">
-    <li><span class="weight weight-light">Light</span> under {{ moderate_kg }} kg</li>
-    <li><span class="weight weight-moderate">Moderate</span> {{ moderate_kg }} to {{ heavy_kg }} kg</li>
-    <li><span class="weight weight-heavy">Heavy</span> {{ heavy_kg }} kg or more</li>
-    <li><span class="weight weight-short">Ran out</span> food was short</li>
-  </ul>
+  {% if days %}
+  <p class="day-hint">Select a day to see each record: the meal, the time, the area and whether food was thrown away or ran out.</p>
   <div class="table-scroll">
-    <table>
+    <table class="day-table">
       <thead>
-        <tr><th scope="col">Record</th><th scope="col">Date and time <small>(Sri Lanka)</small></th><th scope="col">Area</th><th scope="col">Reason</th><th scope="col">Recorded by</th><th scope="col" class="numeric">Quantity</th><th scope="col"><span class="visually-hidden">Action</span></th></tr>
+        <tr><th scope="col">Date</th><th scope="col" class="numeric">Thrown away</th><th scope="col" class="numeric">Ran out</th><th scope="col">Meals</th><th scope="col" class="numeric">Records</th><th scope="col"><span class="visually-hidden">Details</span></th></tr>
       </thead>
       <tbody>
-        {% for record in records %}
-        <tr{% if notice and notice.record.id == record.id %} class="is-new"{% endif %}>
-          <td class="record-id"><span class="ticket">FW-{{ "%03d"|format(record.id) }}</span></td>
-          <td><strong class="cell-primary">{{ record.date }}</strong><span class="cell-secondary">{{ record.time }}</span></td>
-          <td>{{ record.area }}</td>
-          <td>{{ record.reason }}</td>
-          <td>{{ record.recorded_by }}</td>
-          <td class="numeric amount"><span class="weight weight-{{ record.band }}" title="{{ 'Ran out of food' if record.band == 'short' else record.band|capitalize ~ ' waste' }}">{% if record.band == 'short' %}−{% endif %}{{ "%g"|format(record.quantity_kg) }} kg<span class="visually-hidden"> ({{ 'ran out' if record.band == 'short' else record.band }})</span></span></td>
-          <td class="numeric">{% if record.can_edit %}<a class="text-link" href="{{ record.edit_url }}" aria-label="Edit record FW-{{ '%03d'|format(record.id) }}">Edit</a>{% endif %}</td>
+        {% for day in days %}
+        <tr class="day-row{% if notice and notice.record.id in day.records|map(attribute='id')|list %} is-new{% endif %}" data-href="{{ day.url }}">
+          <td><a class="day-link" href="{{ day.url }}">{{ day.date }}</a></td>
+          <td class="numeric"><strong class="day-waste">{{ "%.2f"|format(day.waste_kg) }} kg</strong></td>
+          <td class="numeric">{% if day.short_kg %}<span class="weight weight-short">−{{ "%.2f"|format(day.short_kg) }} kg</span>{% else %}<span class="muted-dash">–</span>{% endif %}</td>
+          <td><span class="meal-dots">{% for meal in day.meals %}<span class="meal-dot{% if meal.records %} is-on{% endif %}" title="{{ meal.name }}: {{ meal.records|length }} {{ 'record' if meal.records|length == 1 else 'records' }}">{{ meal.name[0] }}</span>{% endfor %}</span></td>
+          <td class="numeric">{{ day.records|length }}</td>
+          <td class="numeric"><a class="text-link" href="{{ day.url }}" aria-label="Details for {{ day.date }}">Details</a></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -114,11 +108,19 @@
   </div>
   {% if more %}
   <div class="see-more">
-    {% if more.remaining %}<a class="button button-secondary" href="{{ more.more_url }}">See {{ more.next_batch }} more records</a>{% endif %}
+    {% if more.remaining %}<a class="button button-secondary" href="{{ more.more_url }}">See {{ more.next_batch }} more {{ 'day' if more.next_batch == 1 else 'days' }}</a>{% endif %}
     {% if more.shown > 5 %}<a class="text-link" href="{{ more.fewer_url }}">Show fewer</a>{% endif %}
-    <span class="see-more-status">{{ more.remaining }} older {{ 'record' if more.remaining == 1 else 'records' }} not shown</span>
+    <span class="see-more-status">{{ more.remaining }} older {{ 'day' if more.remaining == 1 else 'days' }} not shown</span>
   </div>
   {% endif %}
+  <script>
+    // The whole row opens the day, not only the date link.
+    document.querySelectorAll("tr.day-row[data-href]").forEach((row) => {
+      row.addEventListener("click", (event) => {
+        if (!event.target.closest("a")) window.location.href = row.dataset.href;
+      });
+    });
+  </script>
   {% else %}
   <div class="empty-state">
     {% if database_error %}

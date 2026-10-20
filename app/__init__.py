@@ -13,7 +13,7 @@ from app.config import load_settings
 from app.database.connection import create_database_engine, make_session_factory
 from app.forecast import model as forecast_model
 from app.forecast import views as forecast
-from app.vision import counting
+from app.vision import counting, meal_check
 from app.waste_records import add_record, edit_record, overview
 from app.web import RequestSizeLimit, install_error_handlers
 
@@ -21,7 +21,7 @@ from app.web import RequestSizeLimit, install_error_handlers
 ROUTERS = (
     overview.router, add_record.router, edit_record.router,                       # waste records
     forecast.router,                                                              # meal forecast
-    counting.router,                                                              # food counting
+    counting.router, meal_check.router,                                           # food counting
 )
 
 

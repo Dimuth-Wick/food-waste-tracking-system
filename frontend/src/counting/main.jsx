@@ -1,5 +1,5 @@
 import { mount } from "../shared/mount.jsx";
-import FoodCounter from "./FoodCounter.jsx";
+import MealCheck from "./MealCheck.jsx";
 import "./counting.css";
 
-mount(FoodCounter);
+mount(MealCheck);

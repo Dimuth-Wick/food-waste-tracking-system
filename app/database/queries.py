@@ -4,11 +4,12 @@ Results are returned as small frozen dataclasses or plain dicts, so callers do
 not depend on SQLAlchemy objects.
 """
 
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from math import isfinite
 
-from sqlalchemy import func, select
+from sqlalchemy import func, inspect, select
 from sqlalchemy.orm import Session
 from werkzeug.security import generate_password_hash
 
@@ -16,6 +17,7 @@ from app.database.tables import (
     LOOKUP_TABLES,
     AreaRow,
     CategoryRow,
+    MealCheckRow,
     ReasonRow,
     UserRow,
     WasteRecordRow,
@@ -215,7 +217,7 @@ def list_waste_records(db: Session, filters: RecordFilters = RecordFilters(), *,
     """Records newest first, with lookup and user names, one page at a time."""
     statement = _where(
         select(WasteRecordRow.id, WasteRecordRow.event_at, WasteRecordRow.quantity_kg,
-               WasteRecordRow.user_id, AreaRow.name.label("area"),
+               WasteRecordRow.user_id, WasteRecordRow.notes, AreaRow.name.label("area"),
                ReasonRow.name.label("reason"),
                UserRow.name.label("recorded_by"))
         .join(AreaRow, AreaRow.id == WasteRecordRow.area_id)
@@ -271,3 +273,101 @@ def list_record_notes(db: Session, *, limit: int) -> list[tuple[str, str]]:
         .limit(limit)
     ).all()
     return [(event_at, notes) for event_at, notes in reversed(rows)]
+
+
+# ---- Meal checks (buffet photos counted at the start and end of a meal) --------
+
+@dataclass(frozen=True)
+class MealCheck:
+    id: int
+    event_at: str
+    meal_type: str
+    food_item: str
+    count_label: str
+    start_count: int
+    end_count: int
+    short_count: int
+    kg_per_piece: float
+    guest_count: int
+    area_id: int
+    waste_record_id: int | None
+    shortage_record_id: int | None
+    user_id: int
+    created_at: str
+
+    @property
+    def eaten_kg(self) -> float:
+        return (self.start_count - self.end_count) * self.kg_per_piece
+
+
+def ensure_meal_check_table(db: Session) -> None:
+    """Create the meal_checks table in databases made before it existed."""
+    MealCheckRow.__table__.create(db.get_bind(), checkfirst=True)
+
+
+def reason_id_named(db: Session, name: str) -> int:
+    """The id of the reason with this name, adding it if it is missing."""
+    found = db.scalar(select(ReasonRow.id).where(ReasonRow.name == name))
+    if found is not None:
+        return found
+    row = ReasonRow(name=name, active=1)
+    db.add(row)
+    _commit(db)
+    return row.id
+
+
+def create_meal_check(db: Session, *, event_at: datetime, meal_type: str, food_item: str,
+                      count_label: str, start_count: int, end_count: int, short_count: int,
+                      kg_per_piece: float, guest_count: int, area_id: int, reason_id: int,
+                      user_id: int) -> tuple[MealCheck, WasteRecord | None, WasteRecord | None]:
+    """Save a meal check, plus a waste record for the leftovers and one for any shortage.
+
+    The waste records hold only a reference to the meal check in their notes, so the forecast
+    reads what was eaten from the meal check once rather than twice.
+    """
+    ensure_meal_check_table(db)
+    leftovers = shortage = None
+    if end_count > 0:
+        leftovers = create_waste_record(
+            db, event_at=event_at, area_id=area_id, reason_id=reason_id,
+            quantity_kg=end_count * kg_per_piece, user_id=user_id,
+            notes=json.dumps({"source": "photo count", "item": food_item, "meal": meal_type,
+                              "start": start_count, "end": end_count}))
+    if short_count > 0:
+        shortage = create_waste_record(
+            db, event_at=event_at, area_id=area_id, reason_id=reason_id_named(db, SHORTAGE_REASON),
+            quantity_kg=short_count * kg_per_piece, user_id=user_id,
+            notes=json.dumps({"source": "photo count", "item": food_item, "meal": meal_type,
+                              "short": short_count}))
+    row = MealCheckRow(
+        event_at=_checked_time(event_at), meal_type=meal_type, food_item=food_item,
+        count_label=count_label, start_count=start_count, end_count=end_count,
+        short_count=short_count, kg_per_piece=kg_per_piece, guest_count=guest_count,
+        area_id=area_id, user_id=user_id, created_at=_now_text(),
+        waste_record_id=leftovers.id if leftovers else None,
+        shortage_record_id=shortage.id if shortage else None,
+    )
+    db.add(row)
+    _commit(db)
+    return _meal_check(row), leftovers, shortage
+
+
+def _meal_check(row: MealCheckRow) -> MealCheck:
+    return MealCheck(row.id, row.event_at, row.meal_type, row.food_item, row.count_label,
+                     row.start_count, row.end_count, row.short_count, row.kg_per_piece,
+                     row.guest_count, row.area_id, row.waste_record_id, row.shortage_record_id,
+                     row.user_id, row.created_at)
+
+
+def list_meal_checks(db: Session, *, limit: int) -> list[MealCheck]:
+    """The newest meal checks, oldest first. Empty if the table does not exist yet."""
+    if not inspect(db.get_bind()).has_table(MealCheckRow.__tablename__):
+        return []
+    rows = db.scalars(select(MealCheckRow).order_by(MealCheckRow.event_at.desc(),
+                                                    MealCheckRow.id.desc()).limit(limit)).all()
+    return [_meal_check(row) for row in reversed(rows)]
+
+
+def latest_piece_weights(db: Session) -> dict[str, float]:
+    """The most recent weight per piece used for each food item, so staff set it only once."""
+    return {check.food_item: check.kg_per_piece for check in list_meal_checks(db, limit=500)}

@@ -14,8 +14,7 @@ from app.database.connection import get_session
 from app.database.queries import get_user_by_username, get_waste_record, list_lookup_items, update_waste_record
 from app.waste_records.add_record import RecordForm, parse_form, render_panel
 from app.waste_records.common import DEMO_USERNAME, LOOKUPS, can_edit, local_time
-from app.waste_records.overview import view_state
-from app.web import url_path
+from app.waste_records.overview import day_page_url
 
 
 logger = logging.getLogger(__name__)
@@ -81,5 +80,5 @@ def save_edited_record(request: Request, record_id: int, form: RecordForm = Depe
                             message="The record could not be updated. Check the details and try again.")
     if updated is None:
         raise HTTPException(404)
-    return RedirectResponse(url_path(request.app, "dashboard", **view_state(request), updated=record_id),
-                            status_code=303)
+    day = local_time(updated.event_at).date().isoformat()
+    return RedirectResponse(day_page_url(request, day, updated=record_id), status_code=303)

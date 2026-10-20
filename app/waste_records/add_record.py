@@ -16,8 +16,8 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_session
 from app.database.queries import create_waste_record, get_user_by_username
-from app.waste_records.common import DEMO_TIMEZONE, DEMO_USERNAME, load_lookups, parse_id
-from app.waste_records.overview import render_overview, view_state
+from app.waste_records.common import DEMO_TIMEZONE, DEMO_USERNAME, load_lookups, local_time, parse_id
+from app.waste_records.overview import day_page_url, render_overview, view_state
 from app.web import url_path
 
 
@@ -43,7 +43,9 @@ def render_panel(request: Request, db: Session, *, lookups, actor_name, values=N
         "areas": lookups.get("areas", []), "reasons": lookups.get("reasons", []),
         "actor_name": actor_name,
         "values": values or {}, "errors": errors or {}, "message": message,
-        "close_url": url_path(request.app, "dashboard", **view_state(request)),
+        # Opened from a day's page, Cancel goes back to that day; otherwise to the overview.
+        "close_url": (day_page_url(request, view_state(request)["day"]) if "day" in view_state(request)
+                      else url_path(request.app, "dashboard", **view_state(request))),
     }
     return render_overview(request, db, panel=panel, status_code=status_code)
 
@@ -145,5 +147,6 @@ def save_new_record(request: Request, form: RecordForm = Depends(),
         return render_panel(request, db, lookups=lookups, actor_name=actor.name,
                             values=form.values, status_code=500,
                             message="The record could not be saved. Check the details and try again.")
-    state = {key: value for key, value in view_state(request).items() if key != "show"}
-    return RedirectResponse(url_path(request.app, "dashboard", **state, created=record.id), status_code=303)
+    # Open the record's day with the new record highlighted.
+    day = local_time(record.event_at).date().isoformat()
+    return RedirectResponse(day_page_url(request, day, created=record.id), status_code=303)

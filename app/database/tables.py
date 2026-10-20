@@ -83,3 +83,35 @@ class WasteRecordRow(Base):
     notes: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     created_at: Mapped[str] = mapped_column(String(32), nullable=False)
     updated_at: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class MealCheckRow(Base):
+    """One buffet meal counted from photos: pieces at the start and at the end of the meal.
+
+    The kilograms left over become a waste record; what was eaten feeds the meal forecast.
+    """
+
+    __tablename__ = "meal_checks"
+    __table_args__ = (
+        CheckConstraint("start_count >= 0 AND end_count >= 0 AND short_count >= 0", name="meal_check_counts"),
+        CheckConstraint("end_count <= start_count", name="meal_check_end_not_above_start"),
+        CheckConstraint("kg_per_piece > 0", name="meal_check_piece_weight_positive"),
+        CheckConstraint("guest_count > 0", name="meal_check_guests_positive"),
+        Index("idx_meal_checks_event_at", "event_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
+    event_at: Mapped[str] = mapped_column(String(32), nullable=False)
+    meal_type: Mapped[str] = mapped_column(Text, nullable=False)
+    food_item: Mapped[str] = mapped_column(Text, nullable=False)
+    count_label: Mapped[str] = mapped_column(Text, nullable=False)
+    start_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    short_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    kg_per_piece: Mapped[float] = mapped_column(Float, nullable=False)
+    guest_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    area_id: Mapped[int] = mapped_column(Id, ForeignKey("areas.id"), nullable=False)
+    waste_record_id: Mapped[int | None] = mapped_column(Id, ForeignKey("waste_records.id"), nullable=True)
+    shortage_record_id: Mapped[int | None] = mapped_column(Id, ForeignKey("waste_records.id"), nullable=True)
+    user_id: Mapped[int] = mapped_column(Id, ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[str] = mapped_column(String(32), nullable=False)

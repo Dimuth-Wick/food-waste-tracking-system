@@ -135,6 +135,16 @@ Open <http://127.0.0.1:5000/food-counting> (**Food counting** in the sidebar). D
 - click any pin or list row to remove a wrong item from the count, and click again to restore it;
 - hover a list row to highlight its item in the photo.
 
+### Buffet meal checks
+
+The Food counting page counts a buffet dish twice: a photo at the **start of the meal** (14 buns put out) and one at the **end** (2 buns left). Below the photos, **Save the meal check** asks for the dish, the meal, when it ended, the weight of one piece, the guests served, the area and the reason for the leftovers; the counts are filled in from the photos and can be corrected. Saving (`POST /api/meal-checks`, `app/vision/meal_check.py`):
+
+- adds a **waste record** for the leftovers (2 x weight per piece), so the Waste overview's totals, daily chart, breakdowns and table update; the row shows "Photo count · Bread: 2 of 14 left";
+- adds a **Ran out (shortage)** record when staff tick that the food ran out and say how many more pieces were needed;
+- stores the meal check in the `meal_checks` table (created automatically in older databases). What was eaten (12 x weight per piece) and the guest count feed the Meal forecast's **How close past forecasts were** section, with the most recently served dishes first.
+
+The weight per piece is remembered per dish. Photos are uploaded for now; scheduled capture from buffet cameras can be added once the camera type and snapshot address are known.
+
 The page uses the open-vocabulary detector [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) from Hugging Face Transformers (PyTorch). It finds objects from a text description, so it can count items without fine-tuning. Overlapping boxes on the same item are counted once. The first count downloads about 600 MB of model weights into the Hugging Face cache (`%USERPROFILE%\.cache\huggingface`). To run offline, save the model with `save_pretrained` and set `FOOD_COUNTER_MODEL_NAME` in the app config to that folder.
 
 Counting works for separate items photographed from above. It does not work for loose food such as rice, curry or salad, and stacked or cut-off items may be miscounted. Uploaded photos and counts are not saved.
@@ -168,7 +178,7 @@ Run tests with `.venv\Scripts\python.exe -m pip install -r requirements-dev.txt`
 
 ## 🗄️ Database
 
-The app uses SQLAlchemy, so it runs on the local SQLite file by default and on PostgreSQL by changing one setting. The record table shows the 5 newest records with a "See more" button, and the overview's totals are added up by the database.
+The app uses SQLAlchemy, so it runs on the local SQLite file by default and on PostgreSQL by changing one setting. The **Waste by day** table has one row per day (thrown away, ran out, meals recorded), newest first, with a "See more" button. Selecting a day opens its own page at `/days/<date>` (`app/templates/day.html`) with the day's totals and every record grouped into Breakfast, Lunch and Dinner: time, thrown away (+) or ran out (−), area, reason, photo counts and who recorded it, with Previous day and Next day buttons, and the overview's totals are added up by the database.
 
 | Setting | Default | Example |
 |---|---|---|
