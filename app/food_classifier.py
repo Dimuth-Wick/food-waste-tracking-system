@@ -3,10 +3,10 @@
 from pathlib import Path
 
 import numpy as np
-from flask import current_app, render_template, request
+from flask import current_app, jsonify, render_template, url_for
 from PIL import ImageOps
 
-from app.image_upload import UploadError, jpeg_preview, read_uploaded_image
+from app.image_upload import UploadError, read_uploaded_image
 
 
 MODEL_FILENAME = "food101_mobilenetv2.keras"
@@ -78,25 +78,32 @@ def _predict(image):
 
 
 def food_prediction():
-    """Show the upload form and a temporary, unsaved prediction."""
-    context = {"active_page": "food_prediction", "predictions": None}
-    if request.method == "GET":
-        return render_template("food_prediction.html", **context)
+    """``GET /food-prediction`` - the React image prediction page."""
+    return render_template(
+        "_react_page.html",
+        react_page="prediction",
+        active_page="food_prediction",
+        heading="Food image prediction",
+        description=("Add a photo of one dish to see what the Food-101 model recognises. "
+                     "Predictions are not saved as waste records."),
+        settings={"apiUrl": url_for("predict_food"), "classCount": len(LABELS)},
+    )
 
+
+def predict_food():
+    """``POST /api/food-predict`` - the three most likely Food-101 dishes."""
     try:
-        image = read_uploaded_image("Choose a food image before predicting.")
-        context["predictions"] = _predict(image)
+        image = read_uploaded_image("Choose a food photo before predicting.")
+        predictions = _predict(image)
     except UploadError as error:
-        context["error"] = error.message
-        return render_template("food_prediction.html", **context), error.status
+        return jsonify({"error": error.message}), error.status
     except (FileNotFoundError, ImportError):
         current_app.logger.exception("Food classifier is unavailable")
-        context["error"] = "The food model is unavailable. Check the server setup."
-        return render_template("food_prediction.html", **context), 503
+        return jsonify({"error": "The food model is unavailable. Check the server setup."}), 503
     except Exception:
         current_app.logger.exception("Food classification failed")
-        context["error"] = "Prediction failed. Check the server logs."
-        return render_template("food_prediction.html", **context), 500
-
-    context["preview"] = jpeg_preview(image)
-    return render_template("food_prediction.html", **context)
+        return jsonify({"error": "Prediction failed. Check the server logs."}), 500
+    return jsonify({"predictions": [
+        {"label": item["label"], "confidence": round(item["confidence"], 1)}
+        for item in predictions
+    ]})

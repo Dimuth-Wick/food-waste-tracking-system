@@ -11,6 +11,9 @@ from app.seed import seed_demo_data
         ("/", "Food waste dashboard", 'href="/" aria-current="page"'),
         ("/records", "Waste records", 'href="/records" aria-current="page"'),
         ("/records/new", "Add waste record", 'href="/records/new" aria-current="page"'),
+        ("/forecast", "Meal demand forecast", 'href="/forecast" aria-current="page"'),
+        ("/food-prediction", "Food image prediction", 'href="/food-prediction" aria-current="page"'),
+        ("/food-detection", "Food counting", 'href="/food-detection" aria-current="page"'),
     ],
 )
 def test_main_pages_and_navigation(path, heading, current_path, tmp_path):
@@ -28,3 +31,4 @@ def test_main_pages_and_navigation(path, heading, current_path, tmp_path):
     assert 'href="/"' in html
     assert 'href="/records"' in html
     assert 'href="/records/new"' in html
+    assert html.count('aria-current="page"') == 1

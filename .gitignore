@@ -221,5 +221,5 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Frontend (React) dependencies; the built bundle in app/static/food-counter is committed
+# Frontend (React) dependencies; the built bundle in app/static/react is committed
 node_modules/

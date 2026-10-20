@@ -1,0 +1,19 @@
+{# A Flask page whose body is a React app built from frontend/src/<react_page>/. #}
+{% extends "base.html" %}
+{% block title %}{{ page_title or heading }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='react/react.css') }}">{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <h1>{{ heading }}</h1>
+    <p class="page-description">{{ description }}</p>
+  </div>
+</div>
+
+<div id="react-root" class="react-root" data-settings="{{ settings|tojson|forceescape }}">
+  <noscript>
+    <div class="notice notice-error">This page needs JavaScript. Turn it on in your browser and reload the page.</div>
+  </noscript>
+</div>
+<script type="module" src="{{ url_for('static', filename='react/' ~ react_page ~ '.js') }}"></script>
+{% endblock %}

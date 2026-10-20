@@ -3,9 +3,8 @@
 {% block content %}
 <section class="page-heading">
   <div>
-    <p class="eyebrow">RECORDS</p>
     <h1>Waste records</h1>
-    <p class="page-description">Review recorded food waste by date, area, category and reason.</p>
+    <p class="page-description">Every waste entry, newest first. Filter by date, area, category or reason.</p>
   </div>
   <a class="button button-primary" href="{{ url_for('new_record') }}">+ Add waste record</a>
 </section>
@@ -19,24 +18,21 @@
 {% set clear_filters_url = url_for('records') %}
 {% include '_filter_form.html' %}
 
-<section class="panel records-panel" aria-labelledby="records-title">
-  <div class="panel-heading">
-    <div>
-      <p class="eyebrow">ALL ENTRIES</p>
-      <h2 id="records-title">Recorded waste</h2>
-    </div>
+<section class="sheet records-panel" aria-labelledby="records-title">
+  <div class="sheet-heading">
+    <h2 id="records-title">Recorded waste</h2>
     <span class="record-count">{{ records|length }} {{ 'record' if records|length == 1 else 'records' }}</span>
   </div>
   {% if records %}
   <div class="table-scroll">
     <table>
       <thead>
-        <tr><th scope="col">Record</th><th scope="col">Date &amp; time <small>(Sri Lanka)</small></th><th scope="col">Area</th><th scope="col">Food category</th><th scope="col">Reason</th><th scope="col">Recorded by</th><th scope="col" class="numeric">Quantity</th><th scope="col">Action</th></tr>
+        <tr><th scope="col">Record</th><th scope="col">Date and time <small>(Sri Lanka)</small></th><th scope="col">Area</th><th scope="col">Food category</th><th scope="col">Reason</th><th scope="col">Recorded by</th><th scope="col" class="numeric">Quantity</th><th scope="col">Action</th></tr>
       </thead>
       <tbody>
         {% for record in records %}
         <tr>
-          <td class="record-id">FW-{{ "%03d"|format(record.id) }}</td>
+          <td class="record-id"><span class="ticket">FW-{{ "%03d"|format(record.id) }}</span></td>
           <td><strong class="cell-primary">{{ record.date }}</strong><span class="cell-secondary">{{ record.time }}</span></td>
           <td>{{ record.area }}</td>
           <td>{{ record.category }}</td>

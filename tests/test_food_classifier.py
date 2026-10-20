@@ -33,32 +33,39 @@ def test_food_prediction_page_and_image_upload(monkeypatch, tmp_path):
     client = app.test_client()
     page = client.get("/food-prediction")
     assert page.status_code == 200
-    assert b"Food image prediction" in page.data
-    assert b'aria-current="page"' in page.data
+    html = page.get_data(as_text=True)
+    assert "<h1>Food image prediction</h1>" in html
+    assert 'aria-current="page"' in html
+    assert "react/prediction.js" in html
+    assert "/api/food-predict" in html
 
     result = client.post(
-        "/food-prediction",
+        "/api/food-predict",
         data={"image": (_image_bytes(), "sample.png")},
         content_type="multipart/form-data",
     )
     assert result.status_code == 200
-    assert b"Pizza" in result.data
-    assert b"82.0%" in result.data
-    assert b"Hamburger" in result.data
-    assert b"data:image/jpeg;base64," in result.data
+    assert result.get_json()["predictions"] == [
+        {"label": "Pizza", "confidence": 82.0},
+        {"label": "Hamburger", "confidence": 12.0},
+        {"label": "Tacos", "confidence": 6.0},
+    ]
 
 
 def test_food_prediction_rejects_missing_and_invalid_uploads(tmp_path):
     app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "test.sqlite3")})
     client = app.test_client()
-    assert client.post("/food-prediction", data={}).status_code == 400
+    missing = client.post("/api/food-predict", data={})
+    assert missing.status_code == 400
+    assert "Choose a food photo" in missing.get_json()["error"]
     result = client.post(
-        "/food-prediction",
+        "/api/food-predict",
         data={"image": (io.BytesIO(b"not an image"), "fake.jpg")},
         content_type="multipart/form-data",
     )
     assert result.status_code == 400
-    assert b"not a valid image" in result.data
+    assert "not a valid image" in result.get_json()["error"]
+    assert client.post("/food-prediction").status_code == 405
 
 
 def test_food101_label_order():

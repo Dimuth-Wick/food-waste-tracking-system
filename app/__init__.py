@@ -42,7 +42,10 @@ def create_app(test_config=None):
                      view_func=forecast.forecast_history, methods=["GET"])
 
     app.add_url_rule("/food-prediction", endpoint="food_prediction",
-                     view_func=food_classifier.food_prediction, methods=["GET", "POST"])
+                     view_func=food_classifier.food_prediction, methods=["GET"])
+
+    app.add_url_rule("/api/food-predict", endpoint="predict_food",
+                     view_func=food_classifier.predict_food, methods=["POST"])
 
     app.add_url_rule("/food-detection", endpoint="food_detection",
                      view_func=food_detector.food_detection, methods=["GET"])

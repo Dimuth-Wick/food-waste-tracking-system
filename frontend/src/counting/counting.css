@@ -1,0 +1,131 @@
+/* Food counting page. Brass marks everything that is counted. */
+.fc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.fc-photo-stage.is-dragging { outline: 3px dashed var(--brass); outline-offset: -10px; }
+
+.fc-box {
+  position: absolute;
+  border: 2px solid rgba(255, 255, 255, .55);
+  border-radius: 8px;
+  pointer-events: none;
+  transition: border-color .15s, background-color .15s;
+}
+.fc-box.is-active { border-color: var(--brass); background: rgba(184, 146, 79, .16); }
+.fc-box.is-removed { border-color: rgba(184, 85, 68, .7); border-style: dashed; }
+
+.fc-pin {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--brass);
+  color: #fff;
+  font-size: .9rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .35);
+  cursor: pointer;
+  animation: fc-pin-drop .38s cubic-bezier(.3, 1.5, .5, 1) backwards;
+  transition: transform .15s, background-color .15s;
+}
+.fc-pin:hover, .fc-pin.is-active { transform: scale(1.18); background: var(--brass-deep); }
+.fc-pin.is-removed { background: var(--rust); font-size: 1.15rem; }
+@keyframes fc-pin-drop {
+  from { opacity: 0; transform: translateY(-22px) scale(.6); }
+  to { opacity: 1; transform: none; }
+}
+
+.fc-form { display: grid; gap: 10px; }
+.fc-form .wide-button { margin-top: 6px; }
+.fc-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  color: #27483a;
+  font-size: 1rem;
+}
+.fc-input:focus { border-color: #50a880; outline: 3px solid #e2f3e8; }
+.fc-intro, .fc-empty { margin: 20px 0 0; color: var(--muted); font-size: .9rem; }
+
+.fc-result { margin-top: 22px; padding-top: 20px; border-top: 1px solid #e7eee9; transition: opacity .2s; }
+.fc-result.is-stale { opacity: .6; }
+.fc-result-heading { display: flex; align-items: baseline; gap: 10px; margin: 0; color: var(--pine); font-size: 1.05rem; font-weight: 650; }
+.fc-total {
+  font-size: 3.6rem;
+  font-weight: 800;
+  line-height: .95;
+  letter-spacing: -.05em;
+  font-variant-numeric: tabular-nums;
+}
+
+.fc-tally { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 12px 0 6px; }
+.fc-tally-group { width: 38px; height: 32px; }
+.fc-tally-group line {
+  stroke: var(--brass);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-dasharray: 60;
+  animation: fc-stroke .3s ease-out both;
+}
+@keyframes fc-stroke { from { stroke-dashoffset: 60; } to { stroke-dashoffset: 0; } }
+
+.fc-slider-label { display: flex; justify-content: space-between; margin-top: 20px; }
+.fc-slider-label output { color: var(--pine); font-variant-numeric: tabular-nums; }
+.fc-slider { width: 100%; margin: 8px 0 0; accent-color: var(--leaf); }
+
+.fc-list { display: grid; gap: 4px; margin: 18px 0 0; padding: 0; list-style: none; }
+.fc-list li { opacity: 0; }
+.fc-list li.is-shown { opacity: 1; transition: opacity .2s; }
+.fc-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 26px 1fr 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: #27483a;
+  font-size: .86rem;
+  text-align: left;
+  cursor: pointer;
+}
+.fc-row:hover, .fc-row.is-active { border-color: var(--line); background: var(--linen); }
+.fc-row-number {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--brass);
+  color: #fff;
+  font-size: .76rem;
+  font-weight: 800;
+}
+.fc-row-bar { height: 6px; overflow: hidden; border-radius: 3px; background: #edf2ee; }
+.fc-row-bar span { display: block; height: 100%; background: var(--leaf); }
+.fc-row-value { text-align: right; font-variant-numeric: tabular-nums; }
+.fc-row.is-removed { color: #9a8580; }
+.fc-row.is-removed .fc-row-number { background: var(--rust); }
+.fc-row.is-removed .fc-row-bar span { background: #d9b8b0; }
+.fc-row.is-removed .fc-row-value { text-decoration: line-through; }
+
+@media (max-width: 1100px) {
+  .fc { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fc-pin, .fc-tally-group line { animation: none; }
+  .fc-list li { opacity: 1; }
+}

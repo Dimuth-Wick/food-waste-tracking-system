@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import PhotoStage from "./PhotoStage.jsx";
 import Tally from "./Tally.jsx";
-import { plural, prefersReducedMotion } from "./text.js";
+import { IMAGE_ERROR, isImage, usePastedImage } from "../shared/photo.jsx";
+import { plural, prefersReducedMotion } from "../shared/text.js";
 
 const PIN_DELAY_MS = 160;
 
@@ -33,8 +34,8 @@ export default function FoodCounter({ settings }) {
   const counted = shown.filter((found) => !removed.has(found.id)).length;
 
   const choosePhoto = useCallback((file) => {
-    if (!file || !file.type.startsWith("image/")) {
-      setError("Choose an image file, such as a JPG or PNG photo.");
+    if (!isImage(file)) {
+      setError(IMAGE_ERROR);
       return;
     }
     request.current?.abort();
@@ -56,19 +57,7 @@ export default function FoodCounter({ settings }) {
     setError("");
   }
 
-  // Paste a photo from the clipboard anywhere on the page.
-  useEffect(() => {
-    const onPaste = (event) => {
-      const file = [...(event.clipboardData?.files ?? [])].find(
-        (pasted) => pasted.type.startsWith("image/"));
-      if (file) {
-        event.preventDefault();
-        choosePhoto(file);
-      }
-    };
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, [choosePhoto]);
+  usePastedImage(choosePhoto);
 
   // Drop the pins in one at a time after a new result arrives.
   useEffect(() => {
@@ -152,9 +141,9 @@ export default function FoodCounter({ settings }) {
         onPhoto={choosePhoto}
       />
 
-      <aside className="fc-panel" aria-label="Counting controls and result">
+      <aside className="side-panel fc-panel" aria-label="Counting controls and result">
         <form className="fc-form" onSubmit={count}>
-          <label className="fc-label" htmlFor="fc-item">What to count</label>
+          <label className="field-label" htmlFor="fc-item">What to count</label>
           <input
             id="fc-item"
             className="fc-input"
@@ -164,12 +153,12 @@ export default function FoodCounter({ settings }) {
             placeholder="cupcake, egg, bread roll…"
             autoComplete="off"
           />
-          <div className="fc-chips" role="group" aria-label="Quick choices">
+          <div className="chips" role="group" aria-label="Quick choices">
             {settings.quickItems.map((choice) => (
               <button
                 key={choice}
                 type="button"
-                className="fc-chip"
+                className="chip"
                 aria-pressed={cleanItem === choice}
                 onClick={() => setItem(choice)}
               >
@@ -177,17 +166,17 @@ export default function FoodCounter({ settings }) {
               </button>
             ))}
           </div>
-          <button className="fc-count-button" type="submit" disabled={counting}>
+          <button className="wide-button" type="submit" disabled={counting}>
             {counting ? `Counting ${plural(cleanItem || "item")}…` : `Count ${plural(cleanItem || "item")}`}
           </button>
           {photo && (
-            <button type="button" className="fc-link-button" onClick={clearPhoto}>
+            <button type="button" className="link-button" onClick={clearPhoto}>
               Use a different photo
             </button>
           )}
         </form>
 
-        {error && <p className="fc-error" role="alert">{error}</p>}
+        {error && <p className="inline-error" role="alert">{error}</p>}
 
         {result ? (
           <section className={`fc-result${isStale ? " is-stale" : ""}`} aria-labelledby="fc-result-heading">
@@ -197,15 +186,15 @@ export default function FoodCounter({ settings }) {
             </h2>
             <Tally count={counted} />
             {isStale && (
-              <p className="fc-hint">This count is for “{resultItem}”. Press Count to count {plural(cleanItem)} instead.</p>
+              <p className="hint">This count is for “{resultItem}”. Press Count to count {plural(cleanItem)} instead.</p>
             )}
             {finished && removed.size > 0 && (
-              <p className="fc-hint">
+              <p className="hint">
                 {removed.size} removed by you. Click a crossed-out item to count it again.
               </p>
             )}
 
-            <label className="fc-label fc-slider-label" htmlFor="fc-confidence">
+            <label className="field-label fc-slider-label" htmlFor="fc-confidence">
               <span>Minimum confidence</span>
               <output htmlFor="fc-confidence">{confidence}%</output>
             </label>
@@ -219,7 +208,7 @@ export default function FoodCounter({ settings }) {
               value={confidence}
               onChange={(event) => setConfidence(Number(event.target.value))}
             />
-            <p className="fc-hint">Lower finds more, but may count things that are not a {resultItem}.</p>
+            <p className="hint">Lower finds more, but may count things that are not a {resultItem}.</p>
 
             {visible.length > 0 ? (
               <ol className="fc-list">

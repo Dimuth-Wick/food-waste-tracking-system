@@ -115,8 +115,12 @@ def _error(message, status):
 def food_detection():
     """``GET /food-detection`` - the React counting page."""
     return render_template(
-        "food_detection.html",
+        "_react_page.html",
+        react_page="counting",
         active_page="food_detection",
+        heading="Food counting",
+        description=("Add a photo, type what to count, and check each item the model "
+                     "pins. Counts are not saved as waste records."),
         settings={
             "apiUrl": url_for("count_food"),
             "defaultItem": DEFAULT_ITEM,

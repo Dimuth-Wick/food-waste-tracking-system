@@ -1,6 +1,5 @@
 """Shared upload handling for the computer-vision demo pages."""
 
-import base64
 import io
 import warnings
 
@@ -48,11 +47,3 @@ def read_uploaded_image(missing_message, field="image"):
             Image.DecompressionBombWarning):
         raise UploadError("The uploaded file is not a valid image.", 400) from None
 
-
-def jpeg_preview(image, max_size=1000):
-    """Return a downscaled base64 JPEG for an inline ``data:`` preview."""
-    image = image.copy()
-    image.thumbnail((max_size, max_size))
-    preview = io.BytesIO()
-    image.save(preview, format="JPEG", quality=85)
-    return base64.b64encode(preview.getvalue()).decode("ascii")

@@ -1,11 +1,4 @@
-<section class="panel filter-panel" aria-labelledby="filter-title">
-  <div class="panel-heading">
-    <div>
-      <p class="eyebrow">FILTER RECORDS</p>
-      <h2 id="filter-title">Filters</h2>
-    </div>
-    <span class="panel-hint">Refine by date and waste details</span>
-  </div>
+<section class="panel filter-panel" aria-label="Filters">
   <form method="get" class="filter-form" novalidate>
     {% for field, label in [('start_date', 'From date'), ('end_date', 'To date')] %}
     <div class="form-field">

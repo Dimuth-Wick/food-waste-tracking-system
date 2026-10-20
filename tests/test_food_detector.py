@@ -1,6 +1,7 @@
 import io
 import json
 from html import unescape
+from pathlib import Path
 
 from PIL import Image
 
@@ -49,21 +50,20 @@ def test_food_counting_page_mounts_react_app(tmp_path):
     page = _client(tmp_path).get("/food-detection")
     assert page.status_code == 200
     html = page.data.decode()
-    assert "Food counting" in html
+    assert "<h1>Food counting</h1>" in html
     assert 'aria-current="page"' in html
-    assert "food-counter/food-counter.js" in html
-    assert "food-counter/food-counter.css" in html
+    assert "react/counting.js" in html
+    assert "react/react.css" in html
     settings = json.loads(unescape(html.split('data-settings="')[1].split('"')[0]))
     assert settings["apiUrl"] == "/api/food-count"
     assert settings["defaultItem"] == "cupcake"
     assert settings["minConfidence"] == food_detector.MIN_CONFIDENCE
 
 
-def test_react_bundle_is_built():
-    static = create_app({"TESTING": True}).static_folder
-    from pathlib import Path
-    assert (Path(static) / "food-counter" / "food-counter.js").is_file()
-    assert (Path(static) / "food-counter" / "food-counter.css").is_file()
+def test_react_bundles_are_built():
+    react = Path(create_app({"TESTING": True}).static_folder) / "react"
+    for name in ["counting.js", "forecast.js", "prediction.js", "react.css"]:
+        assert (react / name).is_file(), f"Run npm run build in frontend/ ({name} missing)"
 
 
 def test_food_count_api_returns_deduplicated_boxes(tmp_path):

@@ -3,9 +3,8 @@
 {% block content %}
 <section class="page-heading">
   <div>
-    <p class="eyebrow">{{ 'EDIT ENTRY' if editing else 'NEW ENTRY' }}</p>
     <h1>{{ 'Edit' if editing else 'Add' }} waste record{% if editing %} #{{ record_id }}{% endif %}</h1>
-    <p class="page-description">{{ 'Update the saved waste details.' if editing else 'Capture what was wasted, where it happened, and why.' }}</p>
+    <p class="page-description">{{ 'Correct the saved details. The change is saved to the same record.' if editing else 'Record what was thrown away, where it happened, and why.' }}</p>
   </div>
   <a class="button button-secondary" href="{{ url_for('records') }}">View records</a>
 </section>
@@ -18,12 +17,9 @@
 <div class="notice notice-error" role="alert"><strong>Check the highlighted fields.</strong>Correct the details below and try again. Nothing has been saved.</div>
 {% endif %}
 
-<section class="panel form-panel" aria-labelledby="entry-title">
-  <div class="panel-heading">
-    <div>
-      <p class="eyebrow">RECORD INFORMATION</p>
-      <h2 id="entry-title">Waste details</h2>
-    </div>
+<section class="sheet form-panel" aria-labelledby="entry-title">
+  <div class="sheet-heading">
+    <h2 id="entry-title">Waste details</h2>
     <span class="required-note">* Required fields</span>
   </div>
   <form method="post" novalidate>
@@ -57,13 +53,13 @@
         </select>
         {% if errors.get('reason_id') %}<small class="field-error" id="reason-error">{{ errors.reason_id }}</small>{% endif %}
       </div>
-      <div class="form-field">
+      <div class="form-field form-field-wide">
         <label for="quantity">Quantity <span aria-hidden="true">*</span></label>
-        <div class="input-unit"><input id="quantity" name="quantity_kg" type="number" min="0" step="any" placeholder="0.000" value="{{ values.get('quantity_kg', '') }}" required {% if errors.get('quantity_kg') %}aria-invalid="true" aria-describedby="quantity-error"{% endif %}><span>kg</span></div>
+        <div class="input-unit input-quantity"><input id="quantity" name="quantity_kg" type="number" min="0" step="any" placeholder="0.000" value="{{ values.get('quantity_kg', '') }}" required {% if errors.get('quantity_kg') %}aria-invalid="true" aria-describedby="quantity-error"{% endif %}><span>kg</span></div>
         {% if errors.get('quantity_kg') %}<small class="field-error" id="quantity-error">{{ errors.quantity_kg }}</small>{% else %}<small>Enter a weight greater than zero.</small>{% endif %}
       </div>
     </div>
-    <p class="form-attribution">{{ 'Editing as' if editing else 'Responsible user' }}: <strong>{{ actor_name or 'Unavailable' }}</strong> · Date and time use Sri Lanka local time.</p>
+    <p class="form-attribution">{{ 'Editing as' if editing else 'Responsible user' }}: <strong>{{ actor_name or 'Unavailable' }}</strong>. Date and time use Sri Lanka local time.</p>
     <div class="form-actions">
       <a class="button button-secondary" href="{{ url_for('records') }}">Cancel</a>
       <button class="button button-primary" type="submit" {% if not actor_name or not areas or not categories or not reasons %}disabled{% endif %}>{{ 'Save changes' if editing else 'Save record' }}</button>

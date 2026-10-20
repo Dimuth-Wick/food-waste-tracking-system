@@ -11,7 +11,7 @@ the scikit-learn pipeline loaded at startup via :mod:`app.ml`.
 import traceback
 import json
 import pandas as pd
-from flask import current_app, jsonify, render_template, request
+from flask import current_app, jsonify, render_template, request, url_for
 
 from app.ml import get_model
 from app.db import get_db
@@ -29,10 +29,19 @@ FOOD_ITEMS = [
 def forecast_page():
     """``GET /forecast`` — render the meal forecast form."""
     return render_template(
-        "forecast.html",
+        "_react_page.html",
+        react_page="forecast",
         active_page="forecast",
-        meal_types=MEAL_TYPES,
-        food_items=FOOD_ITEMS,
+        page_title="Meal forecast",
+        heading="Meal demand forecast",
+        description=("Choose the meal, the dish and how many guests are expected to see "
+                     "how much to prepare. The forecast updates as you change them."),
+        settings={
+            "predictUrl": url_for("predict_meal"),
+            "historyUrl": url_for("forecast_history"),
+            "mealTypes": MEAL_TYPES,
+            "foodItems": FOOD_ITEMS,
+        },
     )
 
 

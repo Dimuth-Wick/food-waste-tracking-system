@@ -144,15 +144,27 @@ Counting works for separate items photographed from above. It does not work for 
 
 ### React frontend
 
-The Food counting page is a React app in [`frontend/`](frontend/), mounted inside the Flask layout. It calls `POST /api/food-count` (multipart `image` and `item`), which returns every match at 20% confidence or more with its box in pixels. The built bundle is committed in `app/static/food-counter/`, so `python run.py` works without Node.js. To change the React code, install [Node.js](https://nodejs.org/), then:
+Three pages are React apps mounted inside the Flask layout. Their source is in [`frontend/src/`](frontend/src/), one folder per page:
+
+| Page | Source | JSON API it calls |
+|---|---|---|
+| Meal forecast | `frontend/src/forecast/` | `POST /api/predict-meal`, `GET /api/forecast-history` |
+| Food image prediction | `frontend/src/prediction/` | `POST /api/food-predict` |
+| Food counting | `frontend/src/counting/` | `POST /api/food-count` |
+
+The dashboard, records and record form stay as Flask templates. All pages share the colours and layout in `app/static/styles.css`: white sheets hold what people enter, and dark pine panels hold what the system answers.
+
+The built files are committed in `app/static/react/`, so `python run.py` works without Node.js. To change the React code, install [Node.js](https://nodejs.org/), then:
 
 ```powershell
 cd frontend
 npm install
-npm run watch   # rebuilds app/static/food-counter on every save; refresh the browser
+npm run watch   # rebuilds app/static/react on every save; refresh the browser
 ```
 
-Run `npm run build` once before committing so the committed bundle matches the source.
+Run `npm run build` once before committing so the committed files match the source.
+
+To see the forecast history chart with sample data, run `python seed_demo_history.py`. It adds demo records, marked as demo data, to `instance/food_waste.sqlite3`.
 
 Run tests with `.venv\Scripts\python.exe -m pip install -r requirements-dev.txt` and `.venv\Scripts\python.exe -m pytest -q --basetemp .pytest-run`.
 

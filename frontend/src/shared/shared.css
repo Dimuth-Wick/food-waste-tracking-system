@@ -1,0 +1,126 @@
+/* Shared by every React page. Colour tokens come from :root in
+   app/static/styles.css, so the React pages and Flask pages stay in step. */
+
+/* A pine "stage" holds what the system answers: photos, forecasts. */
+.stage {
+  position: relative;
+  min-height: 460px;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--pine);
+  color: #fff;
+}
+
+.photo-drop {
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  border: 2px dashed var(--pine-line);
+  color: #e6f0ea;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, background-color .15s;
+}
+.photo-drop:hover, .photo-drop.is-dragging { border-color: var(--brass); background: var(--pine-raised); }
+.photo-drop:focus-within { border-color: var(--brass); outline: 3px solid #2b9371; outline-offset: 3px; }
+.photo-drop-file { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.photo-drop-icon { width: 92px; margin-bottom: 14px; fill: none; stroke: var(--brass); stroke-width: 2.5; }
+.photo-drop-title { color: #fff; font-size: 1.3rem; font-weight: 750; letter-spacing: -.02em; }
+.photo-drop-text { color: var(--pine-text); }
+.photo-drop-browse { color: #fff; text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 3px; }
+.photo-drop-note { margin-top: 18px; color: var(--pine-muted); font-size: .84rem; }
+
+/* A side column of controls and results next to a stage. */
+.side-panel {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--sheet);
+}
+.field-label { color: #2e4e3e; font-size: .88rem; font-weight: 700; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--linen);
+  color: #36594a;
+  font-size: .84rem;
+  cursor: pointer;
+}
+.chip:hover { border-color: #aac3b4; }
+.chip[aria-pressed="true"] { border-color: var(--leaf); background: var(--mist); color: var(--pine); font-weight: 700; }
+.wide-button {
+  min-height: 50px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--leaf);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(19, 88, 68, .16);
+}
+.wide-button:hover:not(:disabled) { background: var(--leaf-dark); }
+.wide-button:disabled { background: #7fa392; cursor: progress; }
+.link-button {
+  justify-self: start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--leaf);
+  font-size: .86rem;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.inline-error {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-left: 4px solid var(--rust);
+  border-radius: 8px;
+  background: #fff5f2;
+  color: #793b32;
+  font-size: .88rem;
+}
+.hint { margin: 8px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.45; }
+
+/* A scan line sweeping a photo while a model works on it. */
+.scan {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--brass);
+  box-shadow: 0 0 18px 4px rgba(184, 146, 79, .55);
+  animation: scan 1.6s ease-in-out infinite alternate;
+}
+@keyframes scan { from { top: 0; } to { top: calc(100% - 3px); } }
+.stage-status {
+  position: absolute;
+  bottom: 18px;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(23, 59, 52, .85);
+  color: #fff;
+  font-size: .84rem;
+  font-weight: 650;
+}
+.photo-frame { position: relative; display: inline-block; max-width: 100%; line-height: 0; }
+.photo-frame img { display: block; max-width: 100%; max-height: 68vh; border-radius: 8px; transition: filter .3s; }
+.photo-frame.is-busy img { filter: saturate(.55) brightness(.8); }
+
+@media (pointer: coarse) {
+  .photo-drop-paste { display: none; }
+}
+
+@media (max-width: 690px) {
+  .stage { min-height: 320px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan { top: 50%; animation: none; }
+}

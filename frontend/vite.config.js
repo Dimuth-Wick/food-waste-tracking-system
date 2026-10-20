@@ -3,19 +3,28 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// Builds the Food counting page into Flask's static folder with fixed file
-// names, so app/templates/food_detection.html can link to them directly.
+const source = (path) => fileURLToPath(new URL(path, import.meta.url));
+
+// Builds each React page into Flask's static folder with fixed file names, so
+// the page templates can link to them directly:
+//   app/static/react/<page>.js  - one script per page
+//   app/static/react/react.css  - all page styles in one file
 export default defineConfig({
   plugins: [react()],
   build: {
-    outDir: fileURLToPath(new URL("../app/static/food-counter", import.meta.url)),
+    outDir: source("../app/static/react"),
     emptyOutDir: true,
+    cssCodeSplit: false,
     rollupOptions: {
-      input: fileURLToPath(new URL("./src/main.jsx", import.meta.url)),
+      input: {
+        counting: source("./src/counting/main.jsx"),
+        forecast: source("./src/forecast/main.jsx"),
+        prediction: source("./src/prediction/main.jsx"),
+      },
       output: {
-        entryFileNames: "food-counter.js",
-        chunkFileNames: "food-counter-[name].js",
-        assetFileNames: "food-counter[extname]",
+        entryFileNames: "[name].js",
+        chunkFileNames: "[name].js",
+        assetFileNames: "react[extname]",
       },
     },
   },
