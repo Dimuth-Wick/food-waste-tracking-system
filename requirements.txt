@@ -11,6 +11,10 @@ joblib>=1.3
 pandas>=2.0
 scikit-learn==1.6.1
 Pillow>=10,<13
+# Automatic camera capture
+opencv-python-headless>=4.9,<5
+apscheduler>=3.10,<4
+tzdata  # time zone data, needed for Asia/Colombo on Windows
 # Food counting (OWLv2)
 torch>=2.14,<3
 transformers>=5.20,<6
