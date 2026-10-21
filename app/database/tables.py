@@ -7,7 +7,7 @@ sorts correctly as text on every database. The app sets created_at and
 updated_at itself, so no database-specific time functions are needed.
 """
 
-from sqlalchemy import BigInteger, CheckConstraint, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import BigInteger, CheckConstraint, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -115,3 +115,97 @@ class MealCheckRow(Base):
     shortage_record_id: Mapped[int | None] = mapped_column(Id, ForeignKey("waste_records.id"), nullable=True)
     user_id: Mapped[int] = mapped_column(Id, ForeignKey("users.id"), nullable=False)
     created_at: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+# ---- Automatic camera capture ---------------------------------------------------------------
+
+class CaptureRow(Base):
+    """One photo taken by a buffet camera (or a failed attempt), and how far its counting got.
+
+    Every photo is kept on disk and here, so they can later become a labelled training dataset.
+    """
+
+    __tablename__ = "captures"
+    __table_args__ = (
+        CheckConstraint("kind IN ('start', 'end')", name="capture_kind_valid"),
+        CheckConstraint("status IN ('ok', 'failed')", name="capture_status_valid"),
+        CheckConstraint("count_status IN ('pending', 'counted', 'failed', 'needs_setup', 'not_counted')",
+                        name="capture_count_status_valid"),
+        Index("idx_captures_day_meal", "capture_date", "meal_type", "kind"),
+    )
+
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
+    captured_at: Mapped[str] = mapped_column(String(32), nullable=False)       # UTC, like every other time
+    capture_date: Mapped[str] = mapped_column(String(10), nullable=False)      # local (Sri Lanka) date
+    meal_type: Mapped[str] = mapped_column(String(20), nullable=False)         # breakfast, lunch, dinner
+    kind: Mapped[str] = mapped_column(String(5), nullable=False)               # start or end
+    station: Mapped[str] = mapped_column(String(40), nullable=False)
+    file_path: Mapped[str | None] = mapped_column(Text, nullable=True, unique=True)  # inside the captures folder
+    status: Mapped[str] = mapped_column(String(10), nullable=False)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    count_status: Mapped[str] = mapped_column(String(12), nullable=False, server_default="pending")
+    count_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    counted_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class CaptureCountRow(Base):
+    """How many of one food the model found in one photo. A zero is stored too."""
+
+    __tablename__ = "capture_counts"
+    __table_args__ = (
+        CheckConstraint("count >= 0", name="capture_count_not_negative"),
+        Index("idx_capture_counts_capture_id", "capture_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
+    capture_id: Mapped[int] = mapped_column(Id, ForeignKey("captures.id"), nullable=False)
+    label: Mapped[str] = mapped_column(String(40), nullable=False)             # what was counted, e.g. "egg"
+    count: Mapped[int] = mapped_column(Integer, nullable=False)
+    confidence_threshold: Mapped[float] = mapped_column(Float, nullable=False)  # percent, e.g. 30
+    model_name: Mapped[str] = mapped_column(Text, nullable=False)
+    detections: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")  # boxes and scores, JSON
+    created_at: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class CameraFoodRow(Base):
+    """A food the cameras look for, with its weight per piece.
+
+    station empty means every station; rows for a named station replace that list for the station.
+    """
+
+    __tablename__ = "camera_foods"
+    __table_args__ = (
+        CheckConstraint("kg_per_piece > 0", name="camera_food_weight_positive"),
+        CheckConstraint("active IN (0, 1)", name="camera_food_active_flag"),
+    )
+
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
+    station: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    count_label: Mapped[str] = mapped_column(String(40), nullable=False)       # what the model looks for
+    dish: Mapped[str | None] = mapped_column(Text, nullable=True)              # the menu dish it belongs to
+    kg_per_piece: Mapped[float] = mapped_column(Float, nullable=False)
+    active: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+
+
+class MealCheckDraftRow(Base):
+    """A meal whose start and end photos are both counted, waiting for staff to add the guests and confirm.
+
+    The counts are read live from the photos until it is confirmed; then what staff saved is kept in details.
+    """
+
+    __tablename__ = "meal_check_drafts"
+    __table_args__ = (
+        CheckConstraint("status IN ('waiting', 'confirmed')", name="meal_check_draft_status_valid"),
+        UniqueConstraint("capture_date", "meal_type", "station", name="meal_check_draft_one_per_meal"),
+    )
+
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
+    capture_date: Mapped[str] = mapped_column(String(10), nullable=False)
+    meal_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    station: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, server_default="waiting")
+    details: Mapped[str] = mapped_column(Text, nullable=False, server_default="{}")      # JSON, once confirmed
+    meal_check_ids: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")
+    created_at: Mapped[str] = mapped_column(String(32), nullable=False)
+    confirmed_at: Mapped[str | None] = mapped_column(String(32), nullable=True)

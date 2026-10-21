@@ -80,7 +80,8 @@ def meal_check_settings(request: Request, db: Session) -> dict | None:
         "saveUrl": url_path(request.app, "save_meal_check"),
         "foodItems": FOOD_ITEMS,
         "mealTypes": MEAL_TYPES,
-        "mealEnds": MEAL_ENDS,
+        "mealEnds": {meal.capitalize(): times["end"] for meal, times in request.app.state.settings["MEAL_SCHEDULE"].items()}
+                    or MEAL_ENDS,
         "areas": [{"id": item.id, "name": item.name} for item in lookups["areas"]],
         "reasons": [{"id": item.id, "name": item.name} for item in reasons],
         "defaultAreaId": default(lookups["areas"], DEFAULT_AREA),

@@ -58,7 +58,7 @@ def test_leftovers_become_a_waste_record_and_eaten_food_feeds_the_forecast(tmp_p
 
     overview = browser.get(result["overview_url"]).text
     assert "saved successfully" in overview
-    assert "Bread: 2 of 14 left" in overview and "From photos" in overview
+    assert "Bun: 2 of 14 left" in overview and "From photos" in overview   # the counted food, not just the dish
 
     history = browser.get("/api/forecast-history").json()["items"]
     assert history[0]["food_item"] == "Bread"                 # most recently served first

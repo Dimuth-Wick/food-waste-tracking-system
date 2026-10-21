@@ -102,9 +102,12 @@ def photo_detail(notes: str) -> str | None:
         return None
     if not isinstance(data, dict) or data.get("source") != "photo count":
         return None
+    # The counted food ("cupcake") says more than its menu dish ("Dessert pudding") when they differ.
+    label = str(data.get("label") or "").strip()
+    name = label.capitalize() if label and label.lower() != str(data.get("item", "")).lower() else data.get("item", "Food")
     if "short" in data:
-        return f"{data.get('item', 'Food')}: {data['short']} pieces short"
-    return f"{data.get('item', 'Food')}: {data.get('end')} of {data.get('start')} left"
+        return f"{name}: {data['short']} pieces short"
+    return f"{name}: {data.get('end')} of {data.get('start')} left"
 
 
 MEALS = ("Breakfast", "Lunch", "Dinner")

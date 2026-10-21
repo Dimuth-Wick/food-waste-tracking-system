@@ -109,6 +109,7 @@ class CaptureEvent:
     kind: str
     started_at: datetime
     photos: list[Photo] = field(default_factory=list)
+    capture_ids: list[int] = field(default_factory=list)  # set once the photos are stored in the database
 
     @property
     def ok_count(self) -> int:
@@ -133,6 +134,8 @@ class CaptureService:
         self.retry_delay = settings.get("CAPTURE_RETRY_DELAY", RETRY_DELAY_SECONDS)
         self._sleep = sleep
         self._busy = threading.Lock()
+        # Called with each finished event to store it and queue its photos for counting; returns their ids.
+        self.on_event = None
 
     def now(self) -> datetime:
         return datetime.now(self.timezone)
@@ -162,6 +165,11 @@ class CaptureService:
                 for camera in self.cameras:
                     event.photos.append(self._take(camera, meal, kind))
             logger.info("Capture %s/%s: %d photos saved, %d failed", meal, kind, event.ok_count, event.failed_count)
+            if self.on_event is not None:
+                try:
+                    event.capture_ids = list(self.on_event(event) or [])
+                except Exception:  # the photos are on disk; they are picked up again at the next start
+                    logger.exception("Could not store the %s %s capture in the database.", meal, kind)
             return event
         finally:
             self._busy.release()

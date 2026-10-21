@@ -331,13 +331,13 @@ def create_meal_check(db: Session, *, event_at: datetime, meal_type: str, food_i
         leftovers = create_waste_record(
             db, event_at=event_at, area_id=area_id, reason_id=reason_id,
             quantity_kg=end_count * kg_per_piece, user_id=user_id,
-            notes=json.dumps({"source": "photo count", "item": food_item, "meal": meal_type,
+            notes=json.dumps({"source": "photo count", "item": food_item, "label": count_label, "meal": meal_type,
                               "start": start_count, "end": end_count}))
     if short_count > 0:
         shortage = create_waste_record(
             db, event_at=event_at, area_id=area_id, reason_id=reason_id_named(db, SHORTAGE_REASON),
             quantity_kg=short_count * kg_per_piece, user_id=user_id,
-            notes=json.dumps({"source": "photo count", "item": food_item, "meal": meal_type,
+            notes=json.dumps({"source": "photo count", "item": food_item, "label": count_label, "meal": meal_type,
                               "short": short_count}))
     row = MealCheckRow(
         event_at=_checked_time(event_at), meal_type=meal_type, food_item=food_item,

@@ -35,6 +35,7 @@ def test_static_files_and_api_docs_are_served(tmp_path):
     schema = browser.get("/openapi.json").json()
     assert set(schema["paths"]) == {
         "/api/predict-meal", "/api/forecast-history", "/api/food-count", "/api/meal-checks", "/api/captures/run-now",
+        "/api/captures", "/api/captures/drafts/{draft_id}/confirm", "/api/camera-foods",
     }
     assert browser.get("/docs").status_code == 200
 

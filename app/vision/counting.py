@@ -7,6 +7,7 @@ list of classes, so it can count items it was never fine-tuned on.
 
 import logging
 import re
+import threading
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from pydantic import BaseModel
@@ -36,6 +37,13 @@ MAX_ITEM_LENGTH = 40
 DUPLICATE_IOU = 0.5
 # A box this much inside a stronger box is a part of that item, not a new one.
 DUPLICATE_CONTAINED = 0.8
+# Photos are shrunk to this longest side before counting (OWLv2 works at 960 px anyway), which keeps
+# memory bounded for large camera frames. Boxes are scaled back to the original photo.
+MAX_COUNT_SIDE = 1280
+
+# One lock for loading and running the model: it is loaded once, and the camera worker and a page
+# request never run it at the same moment (each run already uses every CPU core).
+_MODEL_LOCK = threading.RLock()
 
 
 def _load_detector(settings):
@@ -62,6 +70,22 @@ def _load_detector(settings):
             for score, box in zip(result["scores"], result["boxes"])
         ]
 
+    def detect_many(image, labels, threshold):
+        """Look for every label in one pass; each box comes back with the label it matched best."""
+        inputs = processor(images=image, text=[[f"a photo of a {label}" for label in labels]],
+                           return_tensors="pt")
+        with torch.inference_mode():
+            outputs = model(**inputs)
+        side = max(image.size)
+        result = processor.post_process_grounded_object_detection(
+            outputs, threshold=threshold, target_sizes=torch.tensor([[side, side]]),
+        )[0]
+        return [
+            {"label": labels[int(index)], "score": float(score), "box": [float(value) for value in box]}
+            for score, box, index in zip(result["scores"], result["boxes"], result["labels"])
+        ]
+
+    detect.many = detect_many
     return detect
 
 
@@ -69,9 +93,60 @@ def _get_detector(app):
     """Load once per app; tests may supply a detector as settings["FOOD_COUNTER"]."""
     detector = app.state.settings.get("FOOD_COUNTER") or getattr(app.state, "food_counter", None)
     if detector is None:
-        detector = _load_detector(app.state.settings)
-        app.state.food_counter = detector
+        with _MODEL_LOCK:
+            detector = getattr(app.state, "food_counter", None)
+            if detector is None:
+                detector = _load_detector(app.state.settings)
+                app.state.food_counter = detector
     return detector
+
+
+def _shrunk(image):
+    """The photo at most MAX_COUNT_SIDE on its longest side, and the factor to scale boxes back."""
+    longest = max(image.size)
+    if longest <= MAX_COUNT_SIDE:
+        return image, 1.0
+    factor = MAX_COUNT_SIDE / longest
+    return image.resize((round(image.width * factor), round(image.height * factor))), 1 / factor
+
+
+def _inside(found_box, width, height, scale):
+    """The box scaled back to the original photo and clipped to it, or None if nothing is left."""
+    x0, y0, x1, y1 = (value * scale for value in found_box)
+    box = (max(0.0, min(x0, x1)), max(0.0, min(y0, y1)),
+           min(float(width), max(x0, x1)), min(float(height), max(y0, y1)))
+    return box if box[2] - box[0] >= 1 and box[3] - box[1] >= 1 else None
+
+
+def _one_per_item(candidates):
+    """Strongest first; a box overlapping a stronger one is the same item and is dropped."""
+    candidates.sort(key=lambda found: found["confidence"], reverse=True)
+    kept = []
+    for found in candidates:
+        if not any(_is_duplicate(found["box"], other["box"]) for other in kept):
+            kept.append(found)
+    return kept
+
+
+def count_labels(app, image, labels, threshold):
+    """Count several foods in one photo: [{"label", "confidence", "box"}], one entry per item.
+
+    Every food is looked for at once. An item matched by two labels (a cupcake that also looks like
+    a donut) is counted once, under the label it matched best.
+    """
+    detector = _get_detector(app)
+    small, scale = _shrunk(image)
+    with _MODEL_LOCK:
+        if hasattr(detector, "many"):
+            found = detector.many(small, list(labels), threshold / 100)
+        else:  # a simple detector (as in tests) answers one label at a time
+            found = [{**match, "label": label} for label in labels for match in detector(small, label, threshold / 100)]
+    candidates = []
+    for match in found:
+        box = _inside(match["box"], image.width, image.height, scale)
+        if box is not None:
+            candidates.append({"label": match["label"], "confidence": match["score"] * 100, "box": box})
+    return _one_per_item(candidates)
 
 
 def _area(box):
@@ -91,21 +166,16 @@ def _is_duplicate(box, kept):
 
 def _count(app, image, item, threshold):
     """Return one detection per item, strongest first, inside the photo."""
-    width, height = image.size
+    detector = _get_detector(app)
+    small, scale = _shrunk(image)
+    with _MODEL_LOCK:
+        found = detector(small, item, threshold / 100)
     candidates = []
-    for found in _get_detector(app)(image, item, threshold / 100):
-        x0, y0, x1, y1 = found["box"]
-        box = (max(0.0, min(x0, x1)), max(0.0, min(y0, y1)),
-               min(float(width), max(x0, x1)), min(float(height), max(y0, y1)))
-        if box[2] - box[0] >= 1 and box[3] - box[1] >= 1:
-            candidates.append({"confidence": found["score"] * 100, "box": box})
-    candidates.sort(key=lambda found: found["confidence"], reverse=True)
-
-    detections = []
-    for found in candidates:
-        if not any(_is_duplicate(found["box"], kept["box"]) for kept in detections):
-            detections.append(found)
-    return detections
+    for match in found:
+        box = _inside(match["box"], image.width, image.height, scale)
+        if box is not None:
+            candidates.append({"confidence": match["score"] * 100, "box": box})
+    return _one_per_item(candidates)
 
 
 def _clean_item(raw: str) -> str | None:
@@ -141,7 +211,8 @@ def food_counting(request: Request, db: Session = Depends(get_session)):
         react_page="counting",
         active_page="food_counting",
         heading="Food counting",
-        description=("Count the buffet at the start and at the end of a meal. The pieces left "
+        description=("The buffet cameras photograph each meal at its start and end, and every food on the list "
+                     "is counted automatically. Add the guests to a finished meal and confirm it: the pieces left "
                      "over are saved as waste, and what was eaten updates the meal forecast."),
         settings={
             "apiUrl": url_path(request.app, "count_food"),
@@ -151,6 +222,17 @@ def food_counting(request: Request, db: Session = Depends(get_session)):
             "minConfidence": MIN_CONFIDENCE,
             "defaultConfidence": DEFAULT_CONFIDENCE,
             "mealCheck": meal_check_settings(request, db),
+            "camera": {
+                "capturesUrl": url_path(request.app, "list_captures"),
+                "runNowUrl": url_path(request.app, "run_capture_now"),
+                "foodsUrl": url_path(request.app, "list_camera_foods"),
+                "confirmUrl": url_path(request.app, "confirm_meal_check_draft", draft_id=0).replace("/0/", "/{id}/"),
+                "meals": list(request.app.state.settings["MEAL_SCHEDULE"]),
+                "camerasConfigured": bool(request.app.state.settings["CAMERA_SOURCES"]),
+                "testMode": request.app.state.settings["CAPTURE_TEST_MODE"],
+                "timezone": request.app.state.settings["TIMEZONE"],
+                "dayUrl": url_path(request.app, "day_details", day="DATE"),
+            },
         },
     )
 

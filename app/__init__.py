@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from app.camera import views as camera
 from app.camera.capture import CaptureService
 from app.camera.schedule import start_scheduler, stop_scheduler
+from app.camera.worker import CountingWorker, store_and_queue
 from app.config import load_settings
 from app.database.connection import create_database_engine, make_session_factory
 from app.forecast import model as forecast_model
@@ -32,12 +33,15 @@ ROUTERS = (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start the capture scheduler when the server starts and stop it when it stops."""
+    """Start counting captured photos and the capture scheduler with the server; stop them with it."""
+    if not app.state.settings.get("TESTING"):
+        app.state.counting_worker.start()
     start_scheduler(app)
     try:
         yield
     finally:
         stop_scheduler(app)
+        app.state.counting_worker.stop()
 
 
 def create_app(config=None) -> FastAPI:
@@ -51,6 +55,8 @@ def create_app(config=None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.capture_service = CaptureService(settings)
+    app.state.counting_worker = CountingWorker(app)
+    app.state.capture_service.on_event = lambda event: store_and_queue(app, event)
     app.state.engine = create_database_engine(settings["DATABASE_URL"])
     app.state.session_factory = make_session_factory(app.state.engine)
     forecast_model.init_app(app)

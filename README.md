@@ -53,24 +53,23 @@ Select a day to open its own page with:
 
 A record belongs to the meal saved with it (photo meal checks) or, for manual records, to the meal its time falls in: before 11:00 breakfast, before 16:00 lunch, otherwise dinner.
 
-### Food counting and buffet meal checks (`/food-counting`)
+### Food counting and buffet cameras (`/food-counting`)
 
-Count a buffet dish in two photos, then save the result:
+The buffet cameras photograph every meal by themselves, at its start and at its end (see [Automatic camera capture](#-automatic-camera-capture)). Every photo is checked for each food on the list, so nobody types what to count. The page shows:
 
-1. **Start-of-meal photo:** drop, paste (Ctrl+V) or browse for a photo, type what to count (`bread roll`, `cupcake`, `egg`…) and press **Count**. A numbered pin appears on every item found.
-2. **End-of-meal photo:** the same, for what is left.
-3. **Save the meal check:** the counts are filled in from the photos and can be corrected. Choose the meal and the dish, enter when the meal ended, the **weight of one piece** and the **guests served**, and pick the area and the reason for the leftovers. Tick **The food ran out** and say how many more pieces were needed if there was a shortage. A live summary shows what was eaten and what will be saved as waste.
+- **Camera status:** each station's camera as OK or Offline, and a **Capture now** button (choose the meal, then **Start photos** or **End photos**) for testing.
+- **One day's photos** (pick the date): grouped by meal, with each station's **start photos next to its end photos**. Each side shows what was found, such as "8 eggs, 3 donuts". With several photos, the start uses the **highest** count and the end the **lowest**. Click a photo to see it large with a box on every counted item.
+- **Meal checks waiting for confirmation:** once a meal's start and end photos are counted, a draft appears with the pieces at the start, left at the end, eaten and saved as waste for each food. The camera cannot know how many people ate, so staff enter the **guests served**, correct any count (or add a food the camera missed, or pieces that ran short) and press **Confirm meal check**. Nothing is saved before that.
+- **Foods the cameras look for:** the list (bread roll, egg, donut, cupcake, apple to start with), each with its menu dish and the **weight of one piece**, which turns leftover pieces into kilograms. Add, change or switch off foods here.
 
-Saving a meal check:
+Confirming a meal check, for each food that was put out:
 
 - adds a **waste record** for the leftovers (leftover pieces × weight per piece); nothing is added if nothing is left;
-- adds a **Ran out (shortage)** record when the food ran out;
-- stores the check, so what was eaten and the guest count feed the meal forecast history;
-- opens that day's page with the new record highlighted.
+- adds a **Ran out (shortage)** record for pieces that ran short;
+- stores what was eaten and the guest count, which feed the meal forecast history;
+- shows on that day's page, for example "Cupcake: 3 of 6 left".
 
-The weight per piece is remembered for each dish, so staff only set it once.
-
-In each photo you can lower or raise the **Minimum confidence** slider without re-running the model, click a pin or list row to remove a wrongly counted item (click again to bring it back), and hover a list row to highlight its item.
+**Test the model with your own photos** (at the bottom of the page, to be removed later): upload a start and an end photo, type what to count, and save a meal check by hand. Use it to see how well the model counts: move the **Minimum confidence** slider without re-running the model, click a pin or list row to remove a wrongly counted item, and hover a row to highlight its item.
 
 ### Meal forecast (`/forecast`)
 
@@ -97,7 +96,7 @@ In each photo you can lower or raise the **Minimum confidence** slider without r
 | Edit record | `/records/<id>/edit` | Opens the overview with the edit panel showing |
 | Day page | `/days/<date>` | One day's records by meal |
 | Meal forecast | `/forecast` | Forecast and past accuracy (React) |
-| Food counting | `/food-counting` | Count photos and save meal checks (React) |
+| Food counting | `/food-counting` | Camera photos by day and meal, counts, meal checks to confirm, the food list (React) |
 | API docs | `/docs` | Try the JSON APIs |
 
 | JSON API | What it does |
@@ -106,6 +105,10 @@ In each photo you can lower or raise the **Minimum confidence** slider without r
 | `GET /api/forecast-history` | Past consumption compared with the model's forecast |
 | `POST /api/food-count` | Counts one kind of item in an uploaded photo (nothing is stored) |
 | `POST /api/meal-checks` | Saves a meal check: leftover and shortage records, plus what was eaten |
+| `POST /api/captures/run-now` | Takes the start or end photos of a meal now |
+| `GET /api/captures` | One day's camera photos, counts and meal checks |
+| `POST /api/captures/drafts/<id>/confirm` | Confirms a meal check counted from the cameras |
+| `GET` / `PUT /api/camera-foods` | The foods the cameras look for, and their weights |
 
 ## 🛠️ Technologies Used
 
@@ -116,18 +119,19 @@ In each photo you can lower or raise the **Minimum confidence** slider without r
 | Frontend | Server-rendered HTML and CSS, plus React 19 built with Vite for the interactive pages and the daily chart |
 | Forecast model | scikit-learn pipeline (one-hot encoding and linear regression), saved with joblib |
 | Food counting model | [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) with PyTorch and Hugging Face Transformers |
-| Tests | pytest (44 tests) |
+| Camera capture | OpenCV (reads the camera stream), APScheduler (meal times) |
+| Tests | pytest (85 tests) |
 | Version control | Git, GitHub (`main` for stable work, `dev` for practice) |
 
 ## 🤖 Machine learning
 
 **Meal forecast.** The model in `ml_models/food_demand_model.pkl` is a scikit-learn pipeline that takes three inputs: **meal type**, **food item** and **guest count**, and predicts the **quantity consumed**. The app adds a 10% safety margin to give the recommended quantity. The model is trained outside the app and is not retrained automatically from saved records; the records feed the accuracy view instead.
 
-**Food counting.** OWLv2 is an open-vocabulary detector, so it finds items from a text description and needs no fine-tuning. Overlapping boxes on the same item are counted once, and a box inside a stronger box is treated as part of the same item.
+**Food counting.** OWLv2 is an open-vocabulary detector, so it finds items from a text description and needs no fine-tuning (this is inference, not training). The cameras' photos are checked for every food on the list in one pass. Overlapping boxes on the same item are counted once, and an item that matches two foods is counted once, under the food it matches best. Large camera frames are shrunk for the model and the boxes are scaled back to the full photo. A food counts when the model is at least 30% sure.
 
 - The first count downloads about 600 MB of model weights into the Hugging Face cache (`%USERPROFILE%\.cache\huggingface`). To run offline, save the model with `save_pretrained` and set `FOOD_COUNTER_MODEL_NAME` to that folder.
 - Counting works for separate items photographed from above. It does not work for loose food such as rice, curry or salad, and stacked or cut-off items can be miscounted. The staff can correct any count before saving.
-- Photos are not stored; only the counts are saved.
+- **Camera photos are kept** on disk and in the database, with every box and score (including those under 30%) in the database and in a `.json` file next to each photo, so the captures folder can later become a labelled training dataset. Photos uploaded by hand for testing are not stored.
 
 ## 🚀 Getting Started
 
@@ -170,6 +174,45 @@ npm run watch   # rebuilds app/static/react on every save; refresh the browser
 
 Run `npm run build` once before committing so the committed files match the source.
 
+## 📷 Automatic camera capture
+
+The app photographs the buffet by itself at the start and end of each meal, counts the photos in the background and shows the results on the Food counting page for staff to confirm.
+
+**1. Set the cameras.** Each camera is one buffet station. Camera addresses and passwords go in the `CAMERA_SOURCES` environment variable, never in the code: `name=address`, with several cameras separated by `;`.
+
+```powershell
+$env:CAMERA_SOURCES = "Station 1=http://192.168.8.144:8080/video"
+# several stations, one with a password:
+$env:CAMERA_SOURCES = "Station 1=http://192.168.8.144:8080/video;Station 2=rtsp://user:password@192.168.8.150/stream"
+.venv\Scripts\python.exe run.py
+```
+
+A phone works as a test camera with an IP camera app (for example IP Webcam on Android): start its server and use the `/video` address it shows. The phone and this computer must be on the same Wi-Fi. A webcam plugged into this computer is `Station 1=0`. Without `CAMERA_SOURCES` there is no automatic capture, and the rest of the app works as usual.
+
+**2. How many photos.** With several cameras, each capture takes one photo per camera. With one camera it takes `PHOTOS_PER_CAPTURE` photos (4), a few seconds apart. A camera that fails is tried twice more; the others carry on, and the failure shows on the page as Offline.
+
+**3. Meal times.** The defaults are breakfast 06:00 to 10:00, lunch 12:00 to 14:30 and dinner 19:00 to 22:00, in `Asia/Colombo` time. Lunch and dinner are placeholders until the kitchen confirms them. Change them with `MEAL_SCHEDULE`:
+
+```powershell
+$env:MEAL_SCHEDULE = "breakfast=06:00/10:00;lunch=12:00/14:30;dinner=19:00/22:00"
+```
+
+The app must be running at those times: a capture more than 5 minutes late is skipped. When the app starts, the terminal lists the next time of each capture.
+
+**4. Test without waiting for 6 a.m.** `CAPTURE_TEST_MODE` ignores the meal times and captures every 15 seconds, alternating start and end photos for the meal the clock is in:
+
+```powershell
+$env:CAMERA_SOURCES = "Station 1=http://192.168.8.144:8080/video"
+$env:CAPTURE_TEST_MODE = "1"
+.venv\Scripts\python.exe run.py
+```
+
+Or press **Start photos** / **End photos** on the Food counting page, or call `POST /api/captures/run-now` from <http://127.0.0.1:5000/docs>. Turn test mode off before real use: close the terminal, or run `Remove-Item Env:CAPTURE_TEST_MODE`.
+
+**5. Where the photos go.** `instance\captures\<date>\<meal>\<start|end>\<station>_<HHMMSS>.jpg`, with the counts in a `.json` file next to each photo. The folder is ignored by git. Photos already in the folder when the app starts are picked up and counted.
+
+**6. Counting.** Photos are counted one at a time in the background, so the pages and the schedule never wait. The model loads once, on the first photo, which takes about a minute; after that each photo takes some seconds. A station with no foods on its list shows "No foods set up" and nothing is counted.
+
 ## 🗄️ Database
 
 SQLAlchemy lets the app run on the local SQLite file by default, and on PostgreSQL by changing one setting.
@@ -178,11 +221,15 @@ SQLAlchemy lets the app run on the local SQLite file by default, and on PostgreS
 |---|---|
 | `waste_records` | Every waste or shortage record: time (stored as UTC), area, reason, kilograms, who recorded it, notes |
 | `meal_checks` | Buffet meal checks from photos: start and end pieces, weight per piece, guests, and the records they created |
+| `captures` | Every camera photo, or failed attempt: when, meal, start or end, station, file, and how far its counting got |
+| `capture_counts` | How many of each food the model found in each photo, with its boxes and scores |
+| `camera_foods` | The foods the cameras look for, their menu dish and the weight of one piece |
+| `meal_check_drafts` | Meals whose start and end photos are counted, waiting for staff to confirm |
 | `areas`, `reasons` | The lists used in the forms and filters |
 | `categories` | One hidden placeholder ("Whole waste"); records no longer have a food category, but older databases still require the column |
 | `users` | Demo users with hashed passwords |
 
-`meal_checks` is created automatically the first time it is needed, so older databases keep working. Existing SQLite files from the earlier Flask version work without changes.
+`meal_checks` and the camera tables are created automatically the first time they are needed, so older databases keep working. Existing SQLite files from the earlier Flask version work without changes.
 
 ### Settings
 
@@ -191,6 +238,12 @@ SQLAlchemy lets the app run on the local SQLite file by default, and on PostgreS
 | `DATABASE_URL` | `sqlite:///instance/food_waste.sqlite3` | SQLAlchemy database URL |
 | `ML_MODEL_SKIP` | not set | Set to `1` to start without loading the forecast model |
 | `FOOD_COUNTER_MODEL_NAME` | `google/owlv2-base-patch16-ensemble` | Folder or Hugging Face name of the counting model |
+| `CAMERA_SOURCES` | not set | The buffet cameras, `Station 1=http://...;Station 2=rtsp://...` |
+| `MEAL_SCHEDULE` | `breakfast=06:00/10:00;lunch=12:00/14:30;dinner=19:00/22:00` | When start and end photos are taken |
+| `TIMEZONE` | `Asia/Colombo` | Time zone of the meal schedule |
+| `PHOTOS_PER_CAPTURE` | `4` | Photos per capture when there is one camera |
+| `CAPTURE_TEST_MODE` | not set | `1` captures every 15 seconds (`CAPTURE_TEST_SECONDS`) instead of at meal times |
+| `CAPTURE_DIR` | `instance/captures` | Where camera photos are saved |
 
 To use PostgreSQL:
 
@@ -216,6 +269,7 @@ food-waste-tracking-system/
 │   ├── waste_records/      Waste overview, day pages, and the Add and Edit record panels
 │   ├── forecast/           Meal forecast page, its JSON APIs and the forecast model loader
 │   ├── vision/             Food counting page, photo counting and meal-check saving, upload checks
+│   ├── camera/             Camera capture: taking photos, schedule, background counting, pairing, APIs
 │   ├── templates/          HTML for the server-rendered pages and the shared layout
 │   └── static/             styles.css for every page; react/ holds the built React pages
 ├── frontend/               React source (Node.js only needed to change it)
@@ -237,7 +291,9 @@ Where to start:
 - It is a local prototype: no login or roles, and one demo user records everything.
 - Forecasts cover the 17 dishes and 3 meals the model was trained on.
 - Counting needs a photo of separate items from above, and the weight per piece is entered by staff rather than measured from the photo.
-- Photos are uploaded by hand. Automatic capture from buffet cameras is not built yet.
+- The cameras only find foods on the list; the counting model cannot name a food it was not told about.
+- The camera cannot count guests, so staff confirm each meal check with the guest count.
+- The app must be running at meal times for the automatic captures.
 - The forecast model does not learn from the saved records automatically.
 
 ## 🗺️ Development Roadmap
@@ -250,7 +306,8 @@ Where to start:
 - [x] Count buffet leftovers from start and end photos.
 - [x] Feed what was eaten back into the forecast accuracy charts.
 - [x] Interactive forecast accuracy charts with on-target and off-day marking.
-- [ ] Capture photos automatically from buffet cameras at set times.
+- [x] Capture photos automatically from buffet cameras at set times.
+- [ ] Fine-tune the counting model with the saved camera photos.
 - [ ] Estimate food weight directly from photos.
 - [ ] Add login and roles for kitchen staff, supervisors and administrators.
 - [ ] Track leftover food reused in later meals.
