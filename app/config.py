@@ -17,6 +17,10 @@ CAPTURE_TEST_MODE  Set to 1 to ignore the meal times and capture every 15 second
 CAPTURE_TEST_SECONDS Seconds between captures in test mode (default 15).
 CAPTURE_DIR        Where photos are saved. Default instance/captures.
 
+Waste value (see README, "Waste value"):
+CURRENCY_CODE      Currency of the prices. Default LKR (Sri Lankan rupees).
+CURRENCY_SYMBOL    Shown before amounts. Default "Rs".
+
 Sign-in (see README, "Signing in"):
 REQUIRE_LOGIN      Managers and administrators must sign in. Default on; set to 0 to turn it off.
 SECRET_KEY         Signs the sign-in cookie. Default: a random key created once in instance/secret_key.
@@ -153,6 +157,8 @@ def load_settings(overrides=None):
         "CAPTURE_TEST_MODE": _flag("CAPTURE_TEST_MODE"),
         "CAPTURE_TEST_SECONDS": os.environ.get("CAPTURE_TEST_SECONDS", DEFAULT_TEST_SECONDS),
         "CAPTURE_DIR": os.environ.get("CAPTURE_DIR", str(DEFAULT_CAPTURE_DIR)),
+        "CURRENCY_CODE": os.environ.get("CURRENCY_CODE", "LKR"),
+        "CURRENCY_SYMBOL": os.environ.get("CURRENCY_SYMBOL", "Rs"),
         "REQUIRE_LOGIN": _default_on("REQUIRE_LOGIN"),
         "SESSION_HOURS": os.environ.get("SESSION_HOURS", 8),
         "REMEMBER_DAYS": os.environ.get("REMEMBER_DAYS", 30),

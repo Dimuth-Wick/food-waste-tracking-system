@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from app import auth
 from app.auth import AttemptLimiter, safe_next
+from app.database.prices import ensure_price_data
 from app.database.queries import create_user, set_user_password
 from app.database.seed import seed_demo_data
 from conftest import client, database, make_app, scalar, sql
@@ -281,8 +282,10 @@ def test_records_are_saved_in_the_signed_in_managers_name(tmp_path):
     browser = client(app)
     sign_in(browser)
     with database(app) as db:
+        ensure_price_data(db)
         body = {"event_at": "2026-10-01T12:30",
                 "area_id": scalar(db, "SELECT id FROM areas WHERE name = 'Buffet'"),
+                "category_id": scalar(db, "SELECT id FROM categories WHERE name = 'Fried rice'"),
                 "reason_id": scalar(db, "SELECT id FROM reasons WHERE name = 'Spoilage'"), "quantity_kg": "2.5"}
     saved = browser.post("/records/new", data=body)
     assert saved.status_code == 303

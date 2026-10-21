@@ -7,7 +7,7 @@
   <div class="record-panel-header">
     <div>
       <h2 id="record-panel-title">{{ 'Edit' if panel.editing else 'Add' }} waste record{% if panel.editing %} FW-{{ "%03d"|format(panel.record_id) }}{% endif %}</h2>
-      <p>{{ 'Correct the saved details. The change is saved to the same record.' if panel.editing else 'Record the total waste for a service: when it happened, where, why, and how many kilograms.' }}</p>
+      <p>{{ 'Correct the saved details. The change is saved to the same record.' if panel.editing else 'Record the waste: what food it was, when and where it happened, why, and how many kilograms. Its approximate cost is worked out from the price of that food.' }}</p>
     </div>
     <a class="record-panel-close" href="{{ panel.close_url }}" aria-label="Close without saving">×</a>
   </div>
@@ -26,6 +26,7 @@
     </div>
     {% for field, id, label, placeholder, items in [
       ('area_id', 'area', 'Source area', 'Select an area', panel.areas),
+      ('category_id', 'food', 'Food', 'Select the food', panel.foods),
       ('reason_id', 'reason', 'Reason for waste', 'Select a reason', panel.reasons)] %}
     <div class="form-field">
       <label for="{{ id }}">{{ label }} <span aria-hidden="true">*</span></label>
@@ -41,6 +42,7 @@
       <div class="input-unit input-quantity"><input id="quantity" name="quantity_kg" type="number" min="0" step="any" placeholder="0.000" value="{{ values.get('quantity_kg', '') }}" required {% if errors.get('quantity_kg') %}aria-invalid="true" aria-describedby="quantity-error"{% endif %}><span>kg</span></div>
       {% if errors.get('quantity_kg') %}<small class="field-error" id="quantity-error">{{ errors.quantity_kg }}</small>{% else %}<small>Enter a weight greater than zero. If the food ran out, choose “Ran out (shortage)” as the reason and enter the kilograms that were missing.</small>{% endif %}
     </div>
+    <p class="cost-preview" id="cost-preview" hidden aria-live="polite" data-currency="{{ CURRENCY_SYMBOL }}" data-pricing="{{ panel.pricing|tojson|forceescape }}"></p>
     <p class="form-attribution">{{ 'Editing as' if panel.editing else 'Responsible user' }}: <strong>{{ panel.actor_name or 'Unavailable' }}</strong>. Date and time use Sri Lanka local time.</p>
     <div class="form-actions">
       <a class="button button-secondary" href="{{ panel.close_url }}">Cancel</a>
@@ -48,6 +50,28 @@
     </div>
   </form>
 </dialog>
+<script>
+  // What the waste is worth, as the food and the weight are chosen: kilograms x the food's price per kg.
+  (() => {
+    const box = document.getElementById("cost-preview");
+    const food = document.getElementById("food");
+    const quantity = document.getElementById("quantity");
+    if (!box || !food || !quantity) return;
+    const data = JSON.parse(box.dataset.pricing), symbol = box.dataset.currency;
+    const money = (value) => `${symbol} ${Math.round(value).toLocaleString("en-US")}`;
+    const update = () => {
+      const kg = parseFloat(quantity.value);
+      if (!food.value || !(kg > 0)) { box.hidden = true; return; }
+      const own = data.prices[food.value] !== undefined;
+      const price = own ? data.prices[food.value] : data.mixed;
+      box.textContent = `\u2248 ${money(kg * price)} (${kg} kg at ${money(price)} per kg${own ? "" : ", the Mixed food price"})`;
+      box.hidden = false;
+    };
+    food.addEventListener("change", update);
+    quantity.addEventListener("input", update);
+    update();
+  })();
+</script>
 <script>
   (() => {
     const panel = document.getElementById("record-panel");

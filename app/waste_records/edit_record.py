@@ -26,6 +26,7 @@ def _record_values(record):
     return {
         "event_at": local_time(record.event_at).strftime("%Y-%m-%dT%H:%M"),
         "area_id": str(record.area_id),
+        "category_id": str(record.category_id),
         "reason_id": str(record.reason_id),
         "quantity_kg": f"{record.quantity_kg:g}",
     }
@@ -42,8 +43,8 @@ def _load(request: Request, db: Session, record_id: int):
             raise HTTPException(503, "Demo entry user is unavailable.")
         if not can_edit(actor, record.user_id):
             raise HTTPException(403)
-        # Keep a retired area or reason selectable if this record uses it.
-        selected = {"areas": record.area_id, "reasons": record.reason_id}
+        # Keep a retired area, food or reason selectable if this record uses it.
+        selected = {"areas": record.area_id, "categories": record.category_id, "reasons": record.reason_id}
         lookups = {
             table: [item for item in list_lookup_items(db, table)
                     if item.active or item.id == selected[table]]

@@ -67,9 +67,10 @@ def generate_demo_data():
         shortage_id = shortage[0] if shortage else cursor.execute("INSERT INTO reasons (name, active) VALUES ('Ran out (shortage)', 1)").lastrowid
         reason_ids = [row[0] for row in cursor.execute("SELECT id FROM reasons WHERE active = 1 AND id != ?", (shortage_id,))]
         user_id = cursor.execute("SELECT id FROM users LIMIT 1").fetchone()[0]
-        # Records no longer carry a food category; the old column points at one placeholder.
-        row = cursor.execute("SELECT id FROM categories WHERE name = 'Whole waste'").fetchone()
-        category_id = row[0] if row else cursor.execute("INSERT INTO categories (name, active) VALUES ('Whole waste', 1)").lastrowid
+        # Each record is of one food (its category), which is what its approximate value is worked out from.
+        def food_id(name):
+            row = cursor.execute("SELECT id FROM categories WHERE lower(name) = lower(?)", (name,)).fetchone()
+            return row[0] if row else cursor.execute("INSERT INTO categories (name, active) VALUES (?, 1)", (name,)).lastrowid
         if not area_ids or not reason_ids:
             raise ValueError("no areas or reasons")
     except Exception:
@@ -119,7 +120,7 @@ def generate_demo_data():
                 (event_at, area_id, category_id, reason_id, quantity_kg, user_id, notes)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (event_at, area_id, category_id, reason_id, waste_qty, user_id, notes_json)
+                (event_at, area_id, food_id(item["food_item"]), reason_id, waste_qty, user_id, notes_json)
             )
             records_inserted += 1
 

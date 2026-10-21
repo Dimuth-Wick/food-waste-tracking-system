@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_session
 from app.auth import actor_for
+from app.database.prices import MIXED_FOOD, price_map
 from app.database.queries import create_waste_record
 from app.waste_records.common import DEMO_TIMEZONE, load_lookups, local_time, parse_id
 from app.waste_records.overview import day_page_url, render_overview, view_state
@@ -24,16 +25,21 @@ from app.web import url_path
 
 logger = logging.getLogger(__name__)
 router = APIRouter(include_in_schema=False)
-FIELD_NAMES = ("event_at", "area_id", "reason_id", "quantity_kg")
+FIELD_NAMES = ("event_at", "area_id", "category_id", "reason_id", "quantity_kg")
 
 
 class RecordForm:
-    """The four form fields, as submitted text. Validation happens in parse_form."""
+    """The five form fields, as submitted text. Validation happens in parse_form."""
 
-    def __init__(self, event_at: str = Form(""), area_id: str = Form(""),
+    def __init__(self, event_at: str = Form(""), area_id: str = Form(""), category_id: str = Form(""),
                  reason_id: str = Form(""), quantity_kg: str = Form("")):
         self.values = {name: value.strip() for name, value in zip(
-            FIELD_NAMES, (event_at, area_id, reason_id, quantity_kg))}
+            FIELD_NAMES, (event_at, area_id, category_id, reason_id, quantity_kg))}
+
+
+def _foods(categories) -> list:
+    """The foods to choose from: A to Z, with "Mixed food" last for waste that is not one dish."""
+    return sorted(categories, key=lambda item: (item.name == MIXED_FOOD, item.name.lower()))
 
 
 def render_panel(request: Request, db: Session, *, lookups, actor_name, values=None,
@@ -42,7 +48,7 @@ def render_panel(request: Request, db: Session, *, lookups, actor_name, values=N
     panel = {
         "editing": record_id is not None, "record_id": record_id,
         "areas": lookups.get("areas", []), "reasons": lookups.get("reasons", []),
-        "actor_name": actor_name,
+        "foods": _foods(lookups.get("categories", [])), "pricing": price_map(db), "actor_name": actor_name,
         "values": values or {}, "errors": errors or {}, "message": message,
         # Opened from a day's page, Cancel goes back to that day; otherwise to the overview.
         "close_url": (day_page_url(request, view_state(request)["day"]) if "day" in view_state(request)
@@ -72,6 +78,7 @@ def parse_form(values, lookups):
 
     selected_ids = {}
     for field, label, items in (("area_id", "source area", lookups["areas"]),
+                                ("category_id", "food", lookups["categories"]),
                                 ("reason_id", "reason for waste", lookups["reasons"])):
         raw_id = values[field]
         if not raw_id:

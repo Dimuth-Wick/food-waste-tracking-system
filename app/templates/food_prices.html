@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Food prices{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <h1>Food prices</h1>
+    <p class="page-description">An approximate price per kilogram for each food, in {{ CURRENCY_SYMBOL }}. Waste is valued as kilograms × this price, so every value in Wastewise is an estimate. Change a price and the value of every record of that food updates.</p>
+  </div>
+</section>
+
+{% if saved %}<div class="notice notice-success" role="status"><strong>Prices saved.</strong>Every waste value now uses them.</div>{% endif %}
+{% if errors %}<div class="notice notice-error" role="alert"><strong>{{ errors.get('form') or 'Check the highlighted prices.' }}</strong>{% if not errors.get('form') %}Nothing was saved. Correct them and try again.{% endif %}</div>{% endif %}
+
+<form method="post" class="sheet prices-sheet" novalidate>
+  <div class="sheet-heading">
+    <h2>Price per kilogram</h2>
+    <span class="sheet-note">The starting prices are rough estimates of ingredient cost. Set your own.</span>
+  </div>
+  <div class="table-scroll">
+    <table class="price-table">
+      <thead>
+        <tr><th scope="col">Food</th><th scope="col" class="numeric">Price per kg</th><th scope="col" class="numeric">Used in</th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr{% if errors.get(row.id|string) %} class="has-error"{% endif %}>
+          <th scope="row">
+            {{ row.name }}
+            {% if row.mixed %}<small>Used for any food without its own price</small>{% endif %}
+          </th>
+          <td class="numeric">
+            <label class="price-input"><span class="visually-hidden">Price per kilogram of {{ row.name }}</span>
+              <span class="cur">{{ CURRENCY_SYMBOL }}</span>
+              <input name="price_{{ row.id }}" type="text" inputmode="decimal" autocomplete="off"
+                     value="{{ entered.get(row.id|string, ('%g'|format(row.price)) if row.price else '') }}"
+                     placeholder="{{ mixed_price|amount }}"
+                     {% if errors.get(row.id|string) %}aria-invalid="true" aria-describedby="price-error-{{ row.id }}"{% endif %}>
+            </label>
+            {% if errors.get(row.id|string) %}<small class="field-error" id="price-error-{{ row.id }}">{{ errors[row.id|string] }}</small>
+            {% elif not row.price %}<small class="price-unset">Using {{ mixed_price|money }}</small>{% endif %}
+          </td>
+          <td class="numeric">{{ row.records }} {{ 'record' if row.records == 1 else 'records' }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="price-new{% if errors.get('new_name') or errors.get('new_price') %} has-error{% endif %}">
+          <th scope="row">
+            <label for="new-name">Add a food</label>
+            <input id="new-name" name="new_name" maxlength="60" placeholder="For example, Boiled egg" value="{{ new.get('name', '') }}" autocomplete="off"
+                   {% if errors.get('new_name') %}aria-invalid="true" aria-describedby="new-name-error"{% endif %}>
+            {% if errors.get('new_name') %}<small class="field-error" id="new-name-error">{{ errors.new_name }}</small>{% endif %}
+          </th>
+          <td class="numeric">
+            <label class="price-input"><span class="visually-hidden">Price per kilogram of the new food</span>
+              <span class="cur">{{ CURRENCY_SYMBOL }}</span>
+              <input name="new_price" type="text" inputmode="decimal" autocomplete="off" placeholder="Price" value="{{ new.get('price', '') }}"
+                     {% if errors.get('new_price') %}aria-invalid="true" aria-describedby="new-price-error"{% endif %}>
+            </label>
+            {% if errors.get('new_price') %}<small class="field-error" id="new-price-error">{{ errors.new_price }}</small>{% endif %}
+          </td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="form-actions price-actions">
+    <p class="muted-note">Leave a price empty to use the Mixed food price. Foods the buffet cameras count (bread roll, egg, donut, cupcake, apple) are priced here too.</p>
+    <button class="button button-primary" type="submit">Save prices</button>
+  </div>
+</form>
+{% endblock %}

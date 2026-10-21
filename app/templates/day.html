@@ -25,14 +25,14 @@
 
 <section class="summary-band" aria-label="Day summary">
   <article class="summary-item summary-item-total">
-    <span class="summary-label">Thrown away</span>
-    <div class="summary-value">{{ "%.2f"|format(day.waste_kg) }}<span>kg</span></div>
-    <p>Food that went to waste</p>
+    <span class="summary-label">Waste value</span>
+    <div class="summary-value"><span class="cur">{{ CURRENCY_SYMBOL }}</span> {{ day.waste_value|amount }}</div>
+    <p>≈ {{ "%.2f"|format(day.waste_kg) }} kg of food thrown away</p>
   </article>
   <article class="summary-item">
     <span class="summary-label">Ran out</span>
     <div class="summary-value">{% if day.short_kg %}−{{ "%.2f"|format(day.short_kg) }}<span>kg</span>{% else %}None{% endif %}</div>
-    <p>Food that was short</p>
+    <p>{% if day.short_kg %}≈ {{ day.short_value|money }} of food that was short{% else %}Food that was short{% endif %}</p>
   </article>
   <article class="summary-item">
     <span class="summary-label">Records</span>
@@ -42,7 +42,7 @@
   <article class="summary-item">
     <span class="summary-label">Most waste</span>
     <div class="summary-value summary-value-text">{{ busiest.name if busiest else '–' }}</div>
-    <p>{% if busiest %}{{ "%.2f"|format(busiest.waste_kg) }} kg thrown away{% else %}Nothing thrown away{% endif %}</p>
+    <p>{% if busiest %}{{ busiest.waste_value|money }} · {{ "%.2f"|format(busiest.waste_kg) }} kg{% else %}Nothing thrown away{% endif %}</p>
   </article>
 </section>
 
@@ -53,7 +53,7 @@
       <h2 id="meal-{{ loop.index }}">{{ meal.name }}</h2>
       <p>
         {% if meal.records %}
-          {% if meal.waste_kg %}<span>{{ "%.2f"|format(meal.waste_kg) }} kg thrown away</span>{% endif %}
+          {% if meal.waste_kg %}<span>{{ meal.waste_value|money }} · {{ "%.2f"|format(meal.waste_kg) }} kg thrown away</span>{% endif %}
           {% if meal.short_kg %}<span class="day-short-text">−{{ "%.2f"|format(meal.short_kg) }} kg ran out</span>{% endif %}
         {% else %}No records{% endif %}
       </p>
@@ -67,7 +67,9 @@
           <span class="day-kind">{{ 'Ran out of food' if record.band == 'short' else 'Thrown away' }}</span>
           <span class="weight weight-{{ record.band }}">{% if record.band == 'short' %}−{% else %}+{% endif %}{{ "%g"|format(record.quantity_kg) }} kg</span>
         </div>
+        <p class="day-value">≈ {{ record.value|money }}{% if record.band == 'short' %} of food short{% else %} lost{% endif %}</p>
         <dl class="day-facts">
+          <div><dt>Food</dt><dd>{{ record.food }}</dd></div>
           <div><dt>Area</dt><dd>{{ record.area }}</dd></div>
           <div><dt>Reason</dt><dd>{{ record.reason }}</dd></div>
           {% if record.photo %}<div class="day-fact-wide"><dt>From photos</dt><dd>{{ record.photo }}</dd></div>{% endif %}

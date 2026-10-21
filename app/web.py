@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
-from jinja2 import pass_context
+from jinja2 import pass_context, pass_environment
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
@@ -53,6 +53,16 @@ def _template_url_for(context, name, **params):
 
 
 templates.env.globals["url_for"] = _template_url_for
+
+
+@pass_environment
+def _money(env, value) -> str:
+    """12340.6 -> "Rs 12,341": whole rupees, since prices are approximate."""
+    return f"{env.globals.get('CURRENCY_SYMBOL', 'Rs')} {round(float(value or 0)):,}"
+
+
+templates.env.filters["money"] = _money
+templates.env.filters["amount"] = lambda value: f"{round(float(value or 0)):,}"
 
 
 def render(request: Request, template: str, status_code: int = 200, **context):

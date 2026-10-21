@@ -231,6 +231,7 @@ def food_counting(request: Request, db: Session = Depends(get_session)):
                 "camerasConfigured": bool(request.app.state.settings["CAMERA_SOURCES"]),
                 "testMode": request.app.state.settings["CAPTURE_TEST_MODE"],
                 "timezone": request.app.state.settings["TIMEZONE"],
+                "currency": request.app.state.settings["CURRENCY_SYMBOL"],
                 "dayUrl": url_path(request.app, "day_details", day="DATE"),
             },
         },

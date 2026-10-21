@@ -27,6 +27,7 @@ The project uses large-scale hotels such as **The Kingsbury, Sri Lanka**, as a r
   Meal + dish + expected guests ──> forecast model ──> how much to prepare
 ```
 
+- **Waste becomes money.** Each food has an approximate price per kilogram, so every record, day and chart also shows what the waste cost.
 - **Leftovers become waste.** If 14 buns were put out and 2 are left, 2 buns × the weight of one bun is saved as a waste record.
 - **What was eaten feeds the forecast.** The 12 buns eaten and the number of guests are stored, so the forecast page can compare what the model predicted with what really happened.
 - **Running out is not waste.** If the food ran out, the missing kilograms are recorded as a shortage. Shortages are kept out of the waste totals and shown below zero on the daily chart.
@@ -35,12 +36,12 @@ The project uses large-scale hotels such as **The Kingsbury, Sri Lanka**, as a r
 
 ### Waste overview (`/`)
 
-- **Filters** for a date range, area and reason. One set of filters drives the totals, the chart, the breakdowns and the table.
-- **Totals band:** total recorded, today, this week and this month (shortages are not counted as waste).
-- **Waste each day, last 30 days:** a bar chart where bars above zero are kilograms thrown away and bars below zero are days the food ran out. It has a dashed 30-day average, summary figures (thrown away, daily average, highest day, days that ran out), a day-by-day detail box on hover, keyboard support, and a "Show as a table" view.
-- **Where the waste comes from:** kilograms by area and by reason, with the largest highlighted.
+- **Filters** for a date range, area, food and reason. One set of filters drives the totals, the chart, the breakdowns and the table.
+- **Totals band:** the waste **value** (≈ Rs) for the total, today, this week and this month, with the kilograms underneath (shortages are not counted as waste).
+- **Waste each day, last 30 days:** a bar chart, switchable between **cost (Rs)** and **weight (kg)**, where bars above zero are waste and bars below zero are days the food ran out. It has a dashed 30-day average, summary figures (thrown away, daily average, highest day, days that ran out), a day-by-day detail box on hover, keyboard support, and a "Show as a table" view.
+- **Where the waste cost comes from:** value by area, by **food** and by reason, with the most costly highlighted. See [Waste value](#-waste-value).
 - **Waste by day:** one row per day (thrown away, ran out, which of breakfast, lunch and dinner have records, number of records), newest first. It shows the newest 5 days with a **See 20 more days** button.
-- **Add waste record / Edit** open as a side panel over the page. Each record has a date and time, a source area, a reason and a quantity in kilograms. Errors stay in the panel and keep what was typed.
+- **Add waste record / Edit** open as a side panel over the page. Each record has a date and time, a source area, the **food**, a reason and a quantity in kilograms, and shows its approximate cost as you type. Errors stay in the panel and keep what was typed.
 
 ### Day pages (`/days/<date>`)
 
@@ -51,7 +52,7 @@ Select a day to open its own page with:
 - every record with its time, whether it was **thrown away (+)** or **ran out (−)**, the area, the reason, who recorded it, and photo counts such as "Bread: 2 of 14 left";
 - an Edit link on records you may edit, and **Previous day** / **Next day** buttons.
 
-A record belongs to the meal saved with it (photo meal checks) or, for manual records, to the meal its time falls in: before 11:00 breakfast, before 16:00 lunch, otherwise dinner.
+Each record shows its food and what it cost. A record belongs to the meal saved with it (photo meal checks) or, for manual records, to the meal its time falls in: before 11:00 breakfast, before 16:00 lunch, otherwise dinner.
 
 ### Food counting and buffet cameras (`/food-counting`)
 
@@ -94,7 +95,8 @@ Confirming a meal check, for each food that was put out:
 | Waste overview | `/` | Filters, totals, daily chart, breakdowns, waste by day (`/records` redirects here) |
 | Add record | `/records/new` | Opens the overview with the add panel showing |
 | Edit record | `/records/<id>/edit` | Opens the overview with the edit panel showing |
-| Day page | `/days/<date>` | One day's records by meal |
+| Day page | `/days/<date>` | One day's records by meal, with food and value |
+| Food prices | `/food-prices` | The approximate price per kg of each food (sign-in needed) |
 | Meal forecast | `/forecast` | Forecast and past accuracy (React) |
 | Sign in | `/login` | Manager sign-in (public); `POST /logout` signs out |
 | Food counting | `/food-counting` | Camera photos by day and meal, counts, meal checks to confirm, the food list (React) |
@@ -121,7 +123,7 @@ Confirming a meal check, for each food that was put out:
 | Forecast model | scikit-learn pipeline (one-hot encoding and linear regression), saved with joblib |
 | Food counting model | [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) with PyTorch and Hugging Face Transformers |
 | Camera capture | OpenCV (reads the camera stream), APScheduler (meal times) |
-| Tests | pytest (121 tests) |
+| Tests | pytest (142 tests) |
 | Version control | Git, GitHub (`main` for stable work, `dev` for practice) |
 
 ## 🤖 Machine learning
@@ -214,12 +216,31 @@ Or press **Start photos** / **End photos** on the Food counting page, or call `P
 
 **6. Counting.** Photos are counted one at a time in the background, so the pages and the schedule never wait. The model loads once, on the first photo, which takes about a minute; after that each photo takes some seconds. A station with no foods on its list shows "No foods set up" and nothing is counted.
 
+## 💰 Waste value
+
+Hotels care about what waste **costs**, not what it weighs. Every waste record says **which food** it is (rice, chicken curry, bread roll…), each food has an **approximate price per kilogram**, and Wastewise shows waste as money first with the weight underneath: **≈ Rs 220,880** (383 kg).
+
+- **Value = kilograms × the price of that food.** The prices are rough estimates in Sri Lankan rupees (`CURRENCY_CODE=LKR`, shown as `Rs`) of the ingredient cost of a kilogram of prepared food, for example Steamed rice Rs 250, Chicken curry Rs 1,000, Fish curry Rs 1,300. **They are starting guesses, not quotes: review them on the Food prices page and set your own.**
+- **Foods without their own price** use the price of **Mixed food** (also editable), so every record has a value. Leave a price empty to use it.
+- **Values use today's prices.** Change a price and the value of every record of that food, past and future, changes with it. Nothing is stored per record, so prices can be corrected at any time.
+- **Shortages** (food that ran out) are not counted in the waste value. They are shown separately, below zero in the chart, with the value of the food that was short.
+
+**Where it shows**
+- **Waste overview:** the totals band (total, today, this week, this month) leads with value and keeps the kilograms underneath. **Where the waste cost comes from** breaks the cost down **by area, by food and by reason**, most costly first, so a light but expensive food (fish curry) ranks above a heavy cheap one (salad). A **Food** filter narrows everything to one food.
+- **Waste each day:** the 30-day chart switches between **Cost (Rs)** (the default) and **Weight (kg)**.
+- **Waste by day and day pages:** each day's value, each meal's subtotal, and every record's food and "≈ Rs 1,500 lost".
+- **Add / Edit waste record:** choose the **Food**; as you type the weight the form shows the cost, for example "≈ Rs 2,800 (3.5 kg at Rs 800 per kg)".
+- **Camera meal checks:** a counted food (egg, cupcake…) is recorded as that food, and the draft shows each food's price and the value of the leftovers before you confirm.
+- **Food prices** (`/food-prices`, in the sidebar): every food with its price per kg and how many records use it. Edit prices, leave one empty to use the Mixed food price, or add a food. Invalid prices are explained and nothing is saved until they are fixed.
+
+Older records are sorted into foods automatically the first time the app starts: demo records and photo counts use the food named in their notes, and anything unknown stays **Mixed food**. The prices live in the `food_prices` table (created automatically); the foods are the existing `categories` table.
+
 ## 🔐 Signing in
 
 The app is for hotel **managers and administrators**. Everything except the sign-in page needs a sign-in. Visitors are sent to the **Manager sign in** page (`/login`) and come back to the page they asked for afterwards. The page has an animated picture of what Wastewise does (it stands still for people who ask their system for reduced motion) and a form with a show/hide password button, a Caps Lock warning, and clear messages.
 
 - **Who can sign in:** users with the role `manager` or `admin`. Kitchen staff (`entry`) and switched-off accounts cannot. The top bar shows who is signed in and a **Sign out** button.
-- **Records are saved in the signed-in manager's name**, and managers can edit anyone's records.
+- **Records are saved in the signed-in manager's name**, and managers can edit anyone's records. Waste is recorded **by food**, so it can be valued (see [Waste value](#-waste-value)).
 - **How long it lasts:** 8 hours, or 30 days with **Keep me signed in** (`SESSION_HOURS`, `REMEMBER_DAYS`). Changing a user's password, or switching the account off, signs them out at once.
 - **Guessing is slowed down:** after 5 wrong passwords (`LOGIN_MAX_ATTEMPTS`) that username is locked for 15 minutes (`LOGIN_LOCK_MINUTES`), and one address cannot try many usernames in a row. The error never says whether the username or the password was wrong, and a wrong username takes as long to answer as a wrong password. The lock is kept in memory, so it starts again if the app restarts.
 - **The cookie** is signed with `SECRET_KEY` (created once in `instance/secret_key` if you do not set one), is HttpOnly and SameSite=Lax, and holds only a user number, an end time and a password fingerprint. Pages are sent with `Cache-Control: no-store`, so Back after signing out does not show them again. The sign-in cookie is not marked Secure because the app runs on `http://127.0.0.1`; behind HTTPS, put it behind a proxy that does TLS.
@@ -251,7 +272,8 @@ SQLAlchemy lets the app run on the local SQLite file by default, and on PostgreS
 | `camera_foods` | The foods the cameras look for, their menu dish and the weight of one piece |
 | `meal_check_drafts` | Meals whose start and end photos are counted, waiting for staff to confirm |
 | `areas`, `reasons` | The lists used in the forms and filters |
-| `categories` | One hidden placeholder ("Whole waste"); records no longer have a food category, but older databases still require the column |
+| `categories` | The foods: menu dishes, camera foods, food groups and **Mixed food**. Each record is of one food |
+| `food_prices` | The approximate price per kilogram of each food |
 | `users` | Demo users with hashed passwords |
 
 `meal_checks` and the camera tables are created automatically the first time they are needed, so older databases keep working. Existing SQLite files from the earlier Flask version work without changes.
@@ -269,6 +291,7 @@ SQLAlchemy lets the app run on the local SQLite file by default, and on PostgreS
 | `PHOTOS_PER_CAPTURE` | `4` | Photos per capture when there is one camera |
 | `CAPTURE_TEST_MODE` | not set | `1` captures every 15 seconds (`CAPTURE_TEST_SECONDS`) instead of at meal times |
 | `CAPTURE_DIR` | `instance/captures` | Where camera photos are saved |
+| `CURRENCY_CODE` / `CURRENCY_SYMBOL` | `LKR` / `Rs` | Currency of the food prices and values |
 | `REQUIRE_LOGIN` | on | `0` turns the sign-in off |
 | `SECRET_KEY` | created in `instance/secret_key` | Signs the sign-in cookie |
 | `SESSION_HOURS` / `REMEMBER_DAYS` | `8` / `30` | How long a sign-in lasts |
@@ -294,8 +317,8 @@ food-waste-tracking-system/
 │   ├── __init__.py         create_app(): builds the app and includes each feature's routes
 │   ├── config.py           Settings, such as DATABASE_URL
 │   ├── web.py              Shared page helpers: templates, URLs, error pages, upload size limit
-│   ├── database/           Tables (SQLAlchemy), connection, queries and demo seed data
-│   ├── waste_records/      Waste overview, day pages, and the Add and Edit record panels
+│   ├── database/           Tables (SQLAlchemy), connection, queries, food prices (prices.py) and demo seed data
+│   ├── waste_records/      Waste overview, day pages, the Add and Edit record panels, and Food prices
 │   ├── forecast/           Meal forecast page, its JSON APIs and the forecast model loader
 │   ├── vision/             Food counting page, photo counting and meal-check saving, upload checks
 │   ├── camera/             Camera capture: taking photos, schedule, background counting, pairing, APIs
@@ -319,6 +342,7 @@ Where to start:
 
 - It is a local prototype: sign-in is for managers and administrators only, there is no password reset page (use `scripts/set_password.py`), and the sign-in cookie is not marked Secure.
 - Forecasts cover the 17 dishes and 3 meals the model was trained on.
+- Waste values are approximate: the starting prices are rough estimates, values use today's prices rather than the price on the day, and only the cost of the food itself is counted (not labour, energy or disposal).
 - Counting needs a photo of separate items from above, and the weight per piece is entered by staff rather than measured from the photo.
 - The cameras only find foods on the list; the counting model cannot name a food it was not told about.
 - The camera cannot count guests, so staff confirm each meal check with the guest count.
@@ -337,6 +361,8 @@ Where to start:
 - [x] Interactive forecast accuracy charts with on-target and off-day marking.
 - [x] Capture photos automatically from buffet cameras at set times.
 - [ ] Fine-tune the counting model with the saved camera photos.
+- [x] Waste shown as approximate money, with a price per kg for each food.
+- [ ] Show the cost of the recommended quantity on the meal forecast, and keep a history of price changes.
 - [ ] Estimate food weight directly from photos.
 - [x] Manager sign-in with sessions, password protection and an animated sign-in page.
 - [ ] Roles for kitchen staff (limited access), a password-reset page and per-user audit history.

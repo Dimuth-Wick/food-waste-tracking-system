@@ -12,6 +12,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.database.prices import ensure_once
 from app.database.tables import Base
 
 
@@ -39,6 +40,7 @@ def get_session(request: Request):
     """FastAPI dependency: one database session per request, always closed."""
     session = request.app.state.session_factory()
     try:
+        ensure_once(request.app, session)   # foods and prices, set up once per run
         yield session
     finally:
         session.close()

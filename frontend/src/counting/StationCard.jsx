@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { plural } from "../shared/text.js";
 
 const kg = (value) => `${value.toFixed(2)} kg`;
+const money = (value, symbol) => `${symbol} ${Math.round(value).toLocaleString("en-US")}`;
 
 export function photoTime(iso, timezone) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: timezone });
@@ -63,7 +64,7 @@ function Side({ title, time, side, kind, timezone, onOpenPhoto }) {
 }
 
 // One station's start and end photos for a meal, and its meal check.
-export default function StationCard({ meal, station, timezone, mealCheck, confirmUrl, dayUrl, onOpenPhoto, onSaved }) {
+export default function StationCard({ meal, station, timezone, mealCheck, confirmUrl, dayUrl, currency, onOpenPhoto, onSaved }) {
   const draft = station.draft;
   return (
     <article className="sheet cc-station">
@@ -77,9 +78,9 @@ export default function StationCard({ meal, station, timezone, mealCheck, confir
         <Side title="End of meal" time={meal.times?.end} side={station.end} kind="end" timezone={timezone} onOpenPhoto={onOpenPhoto} />
       </div>
       {draft?.status === "waiting" && (
-        <DraftForm draft={draft} mealCheck={mealCheck} url={confirmUrl.replace("{id}", draft.id)} onSaved={onSaved} />
+        <DraftForm draft={draft} mealCheck={mealCheck} currency={currency} url={confirmUrl.replace("{id}", draft.id)} onSaved={onSaved} />
       )}
-      {draft?.status === "confirmed" && <Confirmed draft={draft} dayUrl={dayUrl} />}
+      {draft?.status === "confirmed" && <Confirmed draft={draft} dayUrl={dayUrl} currency={currency} />}
       {!draft && (
         <p className="cc-muted cc-waiting">
           {!station.end.photos.length ? `The meal check appears here once the end photos${meal.times ? ` (${meal.times.end})` : ""} are counted.`
@@ -91,13 +92,14 @@ export default function StationCard({ meal, station, timezone, mealCheck, confir
   );
 }
 
-function Confirmed({ draft, dayUrl }) {
+function Confirmed({ draft, dayUrl, currency }) {
   const waste = draft.foods.reduce((sum, food) => sum + food.wasteKg, 0);
   const eaten = draft.foods.reduce((sum, food) => sum + food.eatenKg, 0);
+  const lost = draft.foods.reduce((sum, food) => sum + (food.wasteValue ?? 0), 0);
   return (
     <div className="cc-confirmed">
       <p>
-        Saved for <strong>{draft.guests}</strong> guests: <strong>{kg(eaten)}</strong> eaten and <strong>{kg(waste)}</strong> left over as waste
+        Saved for <strong>{draft.guests}</strong> guests: <strong>{kg(eaten)}</strong> eaten and <strong>{kg(waste)}</strong> left over as waste (about <strong>{money(lost, currency)}</strong>)
         ({draft.foods.map((food) => `${food.end} of ${food.start} ${plural(food.label, food.start)}`).join(", ")} left).
       </p>
       <a className="text-link" href={dayUrl}>See it on the day's page</a>
@@ -105,7 +107,7 @@ function Confirmed({ draft, dayUrl }) {
   );
 }
 
-function DraftForm({ draft, mealCheck, url, onSaved }) {
+function DraftForm({ draft, mealCheck, currency, url, onSaved }) {
   const [lines, setLines] = useState(() => draft.foods.map((food) => ({ ...food, short: 0 })));
   const [showAll, setShowAll] = useState(false);
   const [guests, setGuests] = useState("");
@@ -128,6 +130,7 @@ function DraftForm({ draft, mealCheck, url, onSaved }) {
   const shown = showAll ? lines : lines.filter((line) => line.start || line.end || line.edited);
   const eaten = lines.reduce((sum, line) => sum + Math.max(0, line.start - line.end) * line.kgPerPiece, 0);
   const waste = lines.reduce((sum, line) => sum + line.end * line.kgPerPiece, 0);
+  const lost = lines.reduce((sum, line) => sum + line.end * line.kgPerPiece * line.pricePerKg, 0);
 
   function change(label, key, value) {
     const number = value === "" ? 0 : Math.max(0, Math.floor(Number(value)) || 0);
@@ -166,7 +169,7 @@ function DraftForm({ draft, mealCheck, url, onSaved }) {
       <div className="table-scroll">
         <table className="cc-draft-table">
           <thead>
-            <tr><th scope="col">Food</th><th scope="col" className="numeric">At the start</th><th scope="col" className="numeric">Left at the end</th><th scope="col" className="numeric">Ran short</th><th scope="col" className="numeric">Eaten</th><th scope="col" className="numeric">Saved as waste</th></tr>
+            <tr><th scope="col">Food</th><th scope="col" className="numeric">At the start</th><th scope="col" className="numeric">Left at the end</th><th scope="col" className="numeric">Ran short</th><th scope="col" className="numeric">Eaten</th><th scope="col" className="numeric">Saved as waste</th><th scope="col" className="numeric">Waste value</th></tr>
           </thead>
           <tbody>
             {shown.map((line) => (
@@ -185,12 +188,13 @@ function DraftForm({ draft, mealCheck, url, onSaved }) {
                 ))}
                 <td className="numeric">{kg(Math.max(0, line.start - line.end) * line.kgPerPiece)}</td>
                 <td className="numeric">{kg(line.end * line.kgPerPiece)}</td>
+                <td className="numeric">{money(line.end * line.kgPerPiece * line.pricePerKg, currency)}</td>
               </tr>
             ))}
-            {shown.length === 0 && <tr><td colSpan={6} className="cc-muted">No food was counted. Show every food to type the counts.</td></tr>}
+            {shown.length === 0 && <tr><td colSpan={7} className="cc-muted">No food was counted. Show every food to type the counts.</td></tr>}
           </tbody>
           <tfoot>
-            <tr><th scope="row">Total</th><td colSpan={3} /><td className="numeric">{kg(eaten)}</td><td className="numeric">{kg(waste)}</td></tr>
+            <tr><th scope="row">Total</th><td colSpan={3} /><td className="numeric">{kg(eaten)}</td><td className="numeric">{kg(waste)}</td><td className="numeric">{money(lost, currency)}</td></tr>
           </tfoot>
         </table>
       </div>

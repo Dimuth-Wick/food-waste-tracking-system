@@ -141,7 +141,7 @@ export default function CameraCaptures({ camera, mealCheck }) {
               </h3>
               {meal.stations.filter((station) => station.start.photos.length || station.end.photos.length).map((station) => (
                 <StationCard key={station.station} meal={meal} station={station} timezone={camera.timezone}
-                  mealCheck={mealCheck} confirmUrl={camera.confirmUrl} dayUrl={camera.dayUrl.replace("DATE", view.date)}
+                  mealCheck={mealCheck} currency={camera.currency} confirmUrl={camera.confirmUrl} dayUrl={camera.dayUrl.replace("DATE", view.date)}
                   onOpenPhoto={setViewer} onSaved={load} />
               ))}
             </section>

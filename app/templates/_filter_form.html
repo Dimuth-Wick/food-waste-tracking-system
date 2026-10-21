@@ -7,7 +7,7 @@
       {% if errors.get(field) %}<small class="field-error" id="{{ field }}-error">{{ errors[field] }}</small>{% endif %}
     </div>
     {% endfor %}
-    {% for field, label, placeholder, items in [('area_id', 'Area', 'All areas', areas), ('reason_id', 'Reason', 'All reasons', reasons)] %}
+    {% for field, label, placeholder, items in [('area_id', 'Area', 'All areas', areas), ('category_id', 'Food', 'All foods', categories), ('reason_id', 'Reason', 'All reasons', reasons)] %}
     <div class="form-field">
       <label for="filter-{{ field }}">{{ label }}</label>
       <select id="filter-{{ field }}" name="{{ field }}" {% if errors.get(field) %}aria-invalid="true" aria-describedby="{{ field }}-error"{% endif %}>

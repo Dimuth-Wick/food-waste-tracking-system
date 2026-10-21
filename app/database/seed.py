@@ -6,6 +6,7 @@ import secrets
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.database.prices import category_named, ensure_price_data
 from app.database.queries import create_user, create_waste_record
 from app.database.tables import LOOKUP_TABLES, UserRow, WasteRecordRow
 
@@ -20,9 +21,9 @@ DEMO_USERS = [
     ("demo_admin", "Demo Administrator", "admin"),
 ]
 SAMPLES = [
-    (1, "Main Kitchen", "Preparation Trimmings", 2.4, "Synthetic preparation waste"),
-    (2, "Buffet", "Overproduction", 5.1, "Synthetic buffet surplus"),
-    (3, "Banquet", "Plate Returns", 1.2, "Synthetic plate returns"),
+    (1, "Main Kitchen", "Vegetables", "Preparation Trimmings", 2.4, "Synthetic preparation waste"),
+    (2, "Buffet", "Fried rice", "Overproduction", 5.1, "Synthetic buffet surplus"),
+    (3, "Banquet", "Dessert pudding", "Plate Returns", 1.2, "Synthetic plate returns"),
 ]
 
 
@@ -52,10 +53,11 @@ def seed_demo_data(db: Session) -> dict[str, str]:
                                       password=credentials[username], role=role)
 
     now = datetime.now(timezone.utc)
-    for days_ago, area, reason, quantity, notes in SAMPLES:
+    ensure_price_data(db)   # the foods and their approximate prices
+    for days_ago, area, food, reason, quantity, notes in SAMPLES:
         create_waste_record(
             db, event_at=(now - timedelta(days=days_ago)).replace(microsecond=0),
-            area_id=ids["areas"][area],
+            area_id=ids["areas"][area], category_id=category_named(db, food).id,
             reason_id=ids["reasons"][reason], quantity_kg=quantity,
             user_id=users["demo_entry"].id, notes=notes,
         )

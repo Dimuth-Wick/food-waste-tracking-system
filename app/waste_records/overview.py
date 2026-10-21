@@ -23,6 +23,7 @@ from app.database.queries import (
     list_daily_amounts,
     list_waste_records,
     total_waste_kg,
+    total_waste_value,
     waste_by,
 )
 from app.waste_records.common import (
@@ -63,8 +64,9 @@ def _within(filters: RecordFilters, start: date, end: date) -> RecordFilters:
 
 
 def _breakdown(rows):
-    largest = max((kg for _, kg in rows), default=0) or 1
-    return [{"name": name, "quantity_kg": kg, "percent": kg / largest * 100} for name, kg in rows]
+    """Bars by value: the most costly first, the longest bar 100%."""
+    largest = max((value for _, _, value in rows), default=0) or 1
+    return [{"name": name, "quantity_kg": kg, "value": value, "percent": value / largest * 100} for name, kg, value in rows]
 
 
 def build_summary(db: Session, filters: RecordFilters, today: date) -> dict:
@@ -74,7 +76,12 @@ def build_summary(db: Session, filters: RecordFilters, today: date) -> dict:
         "today_kg": total_waste_kg(db, _within(filters, today, today)),
         "week_kg": total_waste_kg(db, _within(filters, today - timedelta(days=today.weekday()), today)),
         "month_kg": total_waste_kg(db, _within(filters, today.replace(day=1), today)),
+        "total_value": total_waste_value(db, filters),
+        "today_value": total_waste_value(db, _within(filters, today, today)),
+        "week_value": total_waste_value(db, _within(filters, today - timedelta(days=today.weekday()), today)),
+        "month_value": total_waste_value(db, _within(filters, today.replace(day=1), today)),
         "area_breakdown": _breakdown(waste_by(db, "areas", filters)),
+        "food_breakdown": _breakdown(waste_by(db, "categories", filters)),
         "reason_breakdown": _breakdown(waste_by(db, "reasons", filters)),
         "record_count": count_waste_records(db, filters),
     }
@@ -90,12 +97,15 @@ def build_daily(db: Session, filters: RecordFilters, today: date) -> list[dict]:
     """
     first = today - timedelta(days=DAILY_DAYS - 1)
     window = _within(replace(filters, start_at_utc=None, end_before_utc=None), first, today)
-    days = {first + timedelta(days=i): {"waste": 0.0, "short": 0.0} for i in range(DAILY_DAYS)}
-    for event_at, kg, is_short in list_daily_amounts(db, window):
+    days = {first + timedelta(days=i): {"waste": 0.0, "short": 0.0, "waste_value": 0.0, "short_value": 0.0}
+            for i in range(DAILY_DAYS)}
+    for event_at, kg, value, is_short in list_daily_amounts(db, window):
         day = local_time(event_at).date()
         if day in days:
             days[day]["short" if is_short else "waste"] += kg
-    return [{"date": day.isoformat(), "waste": round(v["waste"], 2), "short": round(v["short"], 2)}
+            days[day]["short_value" if is_short else "waste_value"] += value
+    return [{"date": day.isoformat(), "waste": round(v["waste"], 2), "short": round(v["short"], 2),
+             "waste_value": round(v["waste_value"]), "short_value": round(v["short_value"])}
             for day, v in days.items()]
 
 
@@ -120,9 +130,11 @@ def group_by_day(records: list[dict]) -> list[dict]:
     """One entry per Sri Lanka calendar day, newest first, with waste and shortage totals."""
     days = {}
     for record in records:
-        day = days.setdefault(record["day"], {"day": record["day"], "date": record["date"],
-                                              "waste_kg": 0.0, "short_kg": 0.0, "records": []})
-        day["short_kg" if record["band"] == "short" else "waste_kg"] += record["quantity_kg"]
+        day = days.setdefault(record["day"], {"day": record["day"], "date": record["date"], "waste_kg": 0.0,
+                                              "short_kg": 0.0, "waste_value": 0.0, "short_value": 0.0, "records": []})
+        short = record["band"] == "short"
+        day["short_kg" if short else "waste_kg"] += record["quantity_kg"]
+        day["short_value" if short else "waste_value"] += record["value"]
         day["records"].append(record)
     for day in days.values():
         day["records"].sort(key=lambda record: (record["time"], record["id"]))
@@ -131,6 +143,8 @@ def group_by_day(records: list[dict]) -> list[dict]:
         for meal in day["meals"]:
             meal["waste_kg"] = sum(r["quantity_kg"] for r in meal["records"] if r["band"] != "short")
             meal["short_kg"] = sum(r["quantity_kg"] for r in meal["records"] if r["band"] == "short")
+            meal["waste_value"] = sum(r["value"] for r in meal["records"] if r["band"] != "short")
+            meal["short_value"] = sum(r["value"] for r in meal["records"] if r["band"] == "short")
     return sorted(days.values(), key=lambda day: day["day"], reverse=True)
 
 
@@ -150,7 +164,7 @@ def render_overview(request: Request, db: Session, *, panel=None, status_code=20
     values = {field: state.get(field, "") for field in FILTER_FIELDS}
     context = {
         "active_page": "dashboard", "values": values, "has_filters": bool(filters_only),
-        "errors": {}, "database_error": False, "areas": [], "reasons": [],
+        "errors": {}, "database_error": False, "areas": [], "categories": [], "reasons": [],
         "summary": None, "daily": None, "days": [], "more": None, "notice": None, "panel": panel,
         "moderate_kg": MODERATE_KG, "heavy_kg": HEAVY_KG,
         "add_url": url_path(request.app, "new_record", **state),
@@ -236,7 +250,9 @@ def day_details(request: Request, day: str, db: Session = Depends(get_session)):
     index = next((i for i, item in enumerate(days) if item["day"] == opened.isoformat()), None)
     current = days[index] if index is not None else {
         "day": opened.isoformat(), "date": opened.strftime("%d %b %Y"), "waste_kg": 0.0, "short_kg": 0.0,
-        "records": [], "meals": [{"name": meal, "records": [], "waste_kg": 0.0, "short_kg": 0.0} for meal in MEALS]}
+        "waste_value": 0.0, "short_value": 0.0, "records": [],
+        "meals": [{"name": meal, "records": [], "waste_kg": 0.0, "short_kg": 0.0, "waste_value": 0.0, "short_value": 0.0}
+                  for meal in MEALS]}
     if index is None:
         later = [item for item in days if item["day"] > opened.isoformat()]
         earlier = [item for item in days if item["day"] < opened.isoformat()]
@@ -245,10 +261,10 @@ def day_details(request: Request, day: str, db: Session = Depends(get_session)):
         newer = days[index - 1] if index > 0 else None
         older = days[index + 1] if index + 1 < len(days) else None
     link = lambda item: url_path(request.app, "day_details", day=item["day"], **filters_only) if item else None
-    busiest = max(current["meals"], key=lambda meal: meal["waste_kg"])
+    busiest = max(current["meals"], key=lambda meal: meal["waste_value"])
     return render(
         request, "day.html", active_page="dashboard", day=current, notice=notice,
-        has_filters=bool(filters_only), busiest=busiest if busiest["waste_kg"] else None,
+        has_filters=bool(filters_only), busiest=busiest if busiest["waste_value"] else None,
         newer_url=link(newer), older_url=link(older),
         newer_date=newer["date"] if newer else None, older_date=older["date"] if older else None,
         back_url=url_path(request.app, "dashboard", **filters_only) + "#records",

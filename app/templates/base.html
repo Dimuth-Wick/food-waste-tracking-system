@@ -20,6 +20,7 @@
           <p class="nav-group-label" id="nav-tracking">Waste tracking</p>
           <ul aria-labelledby="nav-tracking">
             <li><a href="{{ url_for('dashboard') }}" {% if active_page == 'dashboard' %}aria-current="page"{% endif %}>Waste overview</a></li>
+            <li><a href="{{ url_for('food_prices') }}" {% if active_page == 'food_prices' %}aria-current="page"{% endif %}>Food prices</a></li>
           </ul>
           <p class="nav-group-label" id="nav-models">Prediction tools</p>
           <ul aria-labelledby="nav-models">

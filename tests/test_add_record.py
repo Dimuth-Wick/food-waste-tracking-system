@@ -2,6 +2,7 @@ import pytest
 
 from app.database.queries import get_user_by_username
 from app.database.seed import seed_demo_data
+from app.database.prices import ensure_price_data
 from conftest import client, database, make_app, scalar, sql
 
 
@@ -15,9 +16,11 @@ def app_with_demo(tmp_path):
 
 def valid_form(app):
     with database(app) as db:
+        ensure_price_data(db)          # the foods and their prices
         return {
             "event_at": "2026-10-01T12:30",
             "area_id": str(scalar(db, "SELECT id FROM areas WHERE name = 'Buffet'")),
+            "category_id": str(scalar(db, "SELECT id FROM categories WHERE name = 'Fried rice'")),
             "reason_id": str(scalar(db, "SELECT id FROM reasons WHERE name = 'Spoilage'")),
             "quantity_kg": "2.75",
         }
@@ -31,7 +34,7 @@ def test_add_panel_opens_over_the_overview(app_with_demo):
     assert '<dialog class="record-panel"' in html
     assert "Add waste record" in html
     assert "Demo Kitchen Staff" in html
-    assert "Total recorded" in html                    # totals are still visible behind it
+    assert "Waste value" in html                       # totals are still visible behind it
     assert 'href="/"' in html                          # Cancel goes back to the overview
 
 

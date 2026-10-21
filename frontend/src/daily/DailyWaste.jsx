@@ -8,7 +8,12 @@ const DAY_WIDTH = 28; // narrowest a day may get before the chart scrolls sidewa
 const WASTE = "#d9480f";
 const SHORT = "#1d6fb8";
 
-const kg = (value) => `${value.toFixed(1)} kg`;
+const kg = (amount) => `${amount.toFixed(1)} kg`;
+const money = (amount, symbol) => `${amount < 0 ? "-" : ""}${symbol} ${Math.round(Math.abs(amount)).toLocaleString("en-US")}`;
+const tickText = (tick, isValue) => {
+  if (isValue && Math.abs(tick) >= 1000) return `${+(tick / 1000).toFixed(1)}k`;
+  return String(Number.isInteger(tick) ? tick : tick.toFixed(1));
+};
 const minus = (text) => text.replace("-", "−");
 
 function niceStep(span, ticks = 4) {
@@ -36,7 +41,14 @@ function bar(x, width, zero, end, radius = 4) {
 }
 
 export default function DailyWaste({ settings }) {
-  const days = settings.days;
+  const currency = settings.currency || "Rs";
+  const [mode, setMode] = useState("value");   // value (money) | weight (kg)
+  const value = mode === "value";
+  const rawDays = settings.days;
+  // The same chart, drawn from either the money or the kilograms.
+  const days = rawDays.map((d) => ({ date: d.date, waste: value ? d.waste_value : d.waste, short: value ? d.short_value : d.short }));
+  const fmt = (amount) => (value ? money(amount, currency) : kg(amount));
+  const unit = value ? currency : "kg";
   const wrap = useRef(null);
   const plot = useRef(null);
   const [available, setAvailable] = useState(640);
@@ -91,14 +103,19 @@ export default function DailyWaste({ settings }) {
   return (
     <div className="dw">
       <dl className="dw-stats">
-        <div><dt>Thrown away</dt><dd>{kg(totalWaste)}</dd></div>
-        <div><dt>Daily average</dt><dd>{kg(average)}</dd></div>
-        <div><dt>Highest day</dt><dd>{peak.waste > 0 ? `${label(peak.date)} · ${kg(peak.waste)}` : "None"}</dd></div>
+        <div><dt>{value ? "Waste value" : "Thrown away"}</dt><dd>{fmt(totalWaste)}</dd></div>
+        <div><dt>Daily average</dt><dd>{fmt(average)}</dd></div>
+        <div><dt>Highest day</dt><dd>{peak.waste > 0 ? `${label(peak.date)} · ${fmt(peak.waste)}` : "None"}</dd></div>
         <div className={shortDays ? "has-short" : undefined}>
           <dt>Ran out of food</dt>
-          <dd>{shortDays ? `${shortDays} ${shortDays === 1 ? "day" : "days"} · ${minus(kg(-totalShort))}` : "No days"}</dd>
+          <dd>{shortDays ? `${shortDays} ${shortDays === 1 ? "day" : "days"} · ${minus(fmt(-totalShort))}` : "No days"}</dd>
         </div>
       </dl>
+
+      <div className="dw-mode" role="group" aria-label="Show the chart in">
+        <button type="button" aria-pressed={value} onClick={() => setMode("value")}>Cost ({currency})</button>
+        <button type="button" aria-pressed={!value} onClick={() => setMode("weight")}>Weight (kg)</button>
+      </div>
 
       <div className="dw-bar">
         <div className="dw-legend" aria-hidden="true">
@@ -110,8 +127,8 @@ export default function DailyWaste({ settings }) {
           {day ? (
             <>
               <strong>{label(day.date)}</strong>
-              <span><i style={{ background: WASTE }} />Thrown away <strong>{kg(day.waste)}</strong></span>
-              <span><i style={{ background: SHORT }} />Ran out <strong>{day.short ? minus(kg(-day.short)) : "0.0 kg"}</strong></span>
+              <span><i style={{ background: WASTE }} />Thrown away <strong>{fmt(day.waste)}</strong></span>
+              <span><i style={{ background: SHORT }} />Ran out <strong>{day.short ? minus(fmt(-day.short)) : fmt(0)}</strong></span>
             </>
           ) : "Point at a day to see its numbers."}
         </p>
@@ -135,11 +152,11 @@ export default function DailyWaste({ settings }) {
               <g key={tick}>
                 <line x1={MARGIN.left} x2={MARGIN.left + innerWidth} y1={y(tick)} y2={y(tick)} className={tick === 0 ? "dw-zero" : "dw-grid"} />
                 <text x={MARGIN.left - 8} y={y(tick)} className={tick === 0 ? "dw-tick is-zero" : "dw-tick"} textAnchor="end" dominantBaseline="middle">
-                  {minus(String(Number.isInteger(tick) ? tick : tick.toFixed(1)))}
+                  {minus(tickText(tick, value))}
                 </text>
               </g>
             ))}
-            <text x={MARGIN.left - 8} y={MARGIN.top - 8} className="dw-tick" textAnchor="end">kg</text>
+            <text x={MARGIN.left - 8} y={MARGIN.top - 8} className="dw-tick" textAnchor="end">{unit}</text>
 
             {hover !== null && <rect x={MARGIN.left + hover * column} y={MARGIN.top} width={column} height={innerHeight} className="dw-column" />}
 
@@ -175,13 +192,14 @@ export default function DailyWaste({ settings }) {
         <summary>Show as a table</summary>
         <div className="table-scroll">
           <table>
-            <thead><tr><th scope="col">Date</th><th scope="col" className="numeric">Thrown away</th><th scope="col" className="numeric">Ran out</th></tr></thead>
+            <thead><tr><th scope="col">Date</th><th scope="col" className="numeric">Waste value</th><th scope="col" className="numeric">Thrown away</th><th scope="col" className="numeric">Ran out</th></tr></thead>
             <tbody>
-              {[...days].reverse().map((d) => (
+              {[...rawDays].reverse().map((d) => (
                 <tr key={d.date}>
                   <td>{parse(d.date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</td>
+                  <td className="numeric">{d.waste_value ? money(d.waste_value, currency) : "–"}</td>
                   <td className="numeric">{d.waste ? kg(d.waste) : "–"}</td>
-                  <td className="numeric">{d.short ? minus(kg(-d.short)) : "–"}</td>
+                  <td className="numeric">{d.short ? `${minus(kg(-d.short))} (${money(d.short_value, currency)})` : "–"}</td>
                 </tr>
               ))}
             </tbody>

@@ -209,3 +209,17 @@ class MealCheckDraftRow(Base):
     meal_check_ids: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")
     created_at: Mapped[str] = mapped_column(String(32), nullable=False)
     confirmed_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+
+class FoodPriceRow(Base):
+    """An approximate price per kilogram for one food (a row of the categories table).
+
+    Waste is valued as kilograms x this price. A food without a price uses the "Mixed food" price.
+    """
+
+    __tablename__ = "food_prices"
+    __table_args__ = (CheckConstraint("price_per_kg > 0", name="food_price_positive"),)
+
+    category_id: Mapped[int] = mapped_column(Id, ForeignKey("categories.id"), primary_key=True)
+    price_per_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String(32), nullable=False)

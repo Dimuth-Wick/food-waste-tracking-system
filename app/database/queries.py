@@ -13,10 +13,12 @@ from sqlalchemy import func, inspect, select
 from sqlalchemy.orm import Session
 from werkzeug.security import generate_password_hash
 
+from app.database.prices import FALLBACK_PRICE, LEGACY_PLACEHOLDER, MIXED_FOOD
 from app.database.tables import (
     LOOKUP_TABLES,
     AreaRow,
     CategoryRow,
+    FoodPriceRow,
     MealCheckRow,
     ReasonRow,
     UserRow,
@@ -25,9 +27,8 @@ from app.database.tables import (
 
 
 ROLES = {"entry", "manager", "admin"}
-# Records describe the whole waste of a service, not one food type. The database column for a
-# category stays (older databases require it), so every record points at this one placeholder.
-WHOLE_WASTE_CATEGORY = "Whole waste"
+# A record's food is its category. Waste that is not one known food is "Mixed food".
+WHOLE_WASTE_CATEGORY = MIXED_FOOD
 # A record with this reason means food ran out (kilograms we were short), not food thrown away.
 # It is kept out of the waste totals and shown below zero on the daily chart.
 SHORTAGE_REASON = "Ran out (shortage)"
@@ -71,6 +72,7 @@ class RecordFilters:
     start_at_utc: str | None = None
     end_before_utc: str | None = None
     area_id: int | None = None
+    category_id: int | None = None
     reason_id: int | None = None
 
 
@@ -166,7 +168,7 @@ def _checked_time(event_at: datetime) -> str:
 
 def whole_waste_category_id(db: Session) -> int:
     """The id of the single "Whole waste" category, created the first time it is needed."""
-    found = db.scalar(select(CategoryRow.id).where(CategoryRow.name == WHOLE_WASTE_CATEGORY))
+    found = db.scalar(select(CategoryRow.id).where(CategoryRow.name.in_([WHOLE_WASTE_CATEGORY, LEGACY_PLACEHOLDER])))
     if found is not None:
         return found
     row = CategoryRow(name=WHOLE_WASTE_CATEGORY, active=1)
@@ -199,13 +201,15 @@ def get_waste_record(db: Session, record_id: int) -> WasteRecord | None:
 
 
 def update_waste_record(db: Session, record_id: int, *, event_at: datetime, area_id: int,
-                        reason_id: int, quantity_kg: float) -> WasteRecord | None:
+                        reason_id: int, quantity_kg: float, category_id: int | None = None) -> WasteRecord | None:
     event_text = _checked_time(event_at)
     quantity = _checked_quantity(quantity_kg)
     row = db.get(WasteRecordRow, record_id) if 0 < record_id <= MAX_ID else None
     if row is None:
         return None
     row.event_at, row.area_id = event_text, area_id
+    if category_id is not None:
+        row.category_id = category_id
     row.reason_id, row.quantity_kg, row.updated_at = reason_id, quantity, _now_text()
     _commit(db)
     return _record(row)
@@ -218,23 +222,49 @@ def _where(statement, filters: RecordFilters):
     if filters.end_before_utc is not None:
         statement = statement.where(record.event_at < filters.end_before_utc)
     for column, value in ((record.area_id, filters.area_id),
+                          (record.category_id, filters.category_id),
                           (record.reason_id, filters.reason_id)):
         if value is not None:
             statement = statement.where(column == value)
     return statement
 
 
+_PRICE_TABLES: set[int] = set()
+
+
+def _ensure_price_table(db: Session) -> None:
+    """The price table exists (empty if nothing has set prices yet), so value queries never fail."""
+    key = id(db.get_bind())
+    if key not in _PRICE_TABLES:
+        FoodPriceRow.__table__.create(db.get_bind(), checkfirst=True)
+        _PRICE_TABLES.add(key)
+
+
+def _value():
+    """SQL for what a record's waste is worth: kilograms x the price of its food, or of Mixed food if it has none."""
+    mixed = (select(FoodPriceRow.price_per_kg).join(CategoryRow, CategoryRow.id == FoodPriceRow.category_id)
+             .where(CategoryRow.name == MIXED_FOOD).scalar_subquery())
+    return WasteRecordRow.quantity_kg * func.coalesce(FoodPriceRow.price_per_kg, mixed, FALLBACK_PRICE)
+
+
+def _priced(statement):
+    return statement.outerjoin(FoodPriceRow, FoodPriceRow.category_id == WasteRecordRow.category_id)
+
+
 def list_waste_records(db: Session, filters: RecordFilters = RecordFilters(), *,
                        limit: int | None = None, offset: int = 0) -> list[dict]:
-    """Records newest first, with lookup and user names, one page at a time."""
+    """Records newest first, with food, lookup and user names and approximate value."""
+    _ensure_price_table(db)
     statement = _where(
-        select(WasteRecordRow.id, WasteRecordRow.event_at, WasteRecordRow.quantity_kg,
-               WasteRecordRow.user_id, WasteRecordRow.notes, AreaRow.name.label("area"),
-               ReasonRow.name.label("reason"),
-               UserRow.name.label("recorded_by"))
-        .join(AreaRow, AreaRow.id == WasteRecordRow.area_id)
-        .join(ReasonRow, ReasonRow.id == WasteRecordRow.reason_id)
-        .join(UserRow, UserRow.id == WasteRecordRow.user_id),
+        _priced(select(WasteRecordRow.id, WasteRecordRow.event_at, WasteRecordRow.quantity_kg,
+                       WasteRecordRow.user_id, WasteRecordRow.notes, WasteRecordRow.category_id,
+                       AreaRow.name.label("area"), CategoryRow.name.label("food"), ReasonRow.name.label("reason"),
+                       UserRow.name.label("recorded_by"), _value().label("value"))
+                .select_from(WasteRecordRow)
+                .join(AreaRow, AreaRow.id == WasteRecordRow.area_id)
+                .join(CategoryRow, CategoryRow.id == WasteRecordRow.category_id)
+                .join(ReasonRow, ReasonRow.id == WasteRecordRow.reason_id)
+                .join(UserRow, UserRow.id == WasteRecordRow.user_id)),
         filters,
     ).order_by(WasteRecordRow.event_at.desc(), WasteRecordRow.id.desc()).offset(offset)
     if limit is not None:
@@ -258,22 +288,35 @@ def total_waste_kg(db: Session, filters: RecordFilters = RecordFilters()) -> flo
         select(func.coalesce(func.sum(WasteRecordRow.quantity_kg), 0.0)), filters))) or 0.0)
 
 
-def list_daily_amounts(db: Session, filters: RecordFilters = RecordFilters()) -> list[tuple[str, float, bool]]:
-    """(event_at, kg, is_shortage) for every matching record, for the daily chart."""
+def total_waste_value(db: Session, filters: RecordFilters = RecordFilters()) -> float:
+    """What the food thrown away is worth, approximately (shortages excluded)."""
+    _ensure_price_table(db)
+    return float(db.scalar(_waste_only(_where(
+        _priced(select(func.coalesce(func.sum(_value()), 0.0)).select_from(WasteRecordRow)), filters))) or 0.0)
+
+
+def list_daily_amounts(db: Session, filters: RecordFilters = RecordFilters()) -> list[tuple[str, float, float, bool]]:
+    """(event_at, kg, value, is_shortage) for every matching record, for the daily chart."""
+    _ensure_price_table(db)
     statement = _where(
-        select(WasteRecordRow.event_at, WasteRecordRow.quantity_kg, ReasonRow.name)
-        .join(ReasonRow, ReasonRow.id == WasteRecordRow.reason_id), filters)
-    return [(at, float(kg), name == SHORTAGE_REASON) for at, kg, name in db.execute(statement)]
+        _priced(select(WasteRecordRow.event_at, WasteRecordRow.quantity_kg, _value(), ReasonRow.name)
+                .select_from(WasteRecordRow)
+                .join(ReasonRow, ReasonRow.id == WasteRecordRow.reason_id)), filters)
+    return [(at, float(kg), float(value), name == SHORTAGE_REASON) for at, kg, value, name in db.execute(statement)]
 
 
-def waste_by(db: Session, table: str, filters: RecordFilters = RecordFilters()) -> list[tuple[str, float]]:
-    """(name, total kg) per area or reason, largest first."""
+def waste_by(db: Session, table: str, filters: RecordFilters = RecordFilters()) -> list[tuple[str, float, float]]:
+    """(name, kg, value) per area, food or reason, most valuable first."""
+    _ensure_price_table(db)
     model = LOOKUP_TABLES[table]
-    column = {"areas": WasteRecordRow.area_id, "reasons": WasteRecordRow.reason_id}[table]
-    total = func.sum(WasteRecordRow.quantity_kg).label("total")
-    statement = _waste_only(_where(select(model.name, total).join(model, model.id == column), filters))
-    rows = db.execute(statement.group_by(model.name).order_by(total.desc(), model.name))
-    return [(name, float(kg)) for name, kg in rows]
+    column = {"areas": WasteRecordRow.area_id, "categories": WasteRecordRow.category_id,
+              "reasons": WasteRecordRow.reason_id}[table]
+    kg = func.sum(WasteRecordRow.quantity_kg).label("kg")
+    value = func.sum(_value()).label("value")
+    statement = _waste_only(_where(
+        _priced(select(model.name, kg, value).select_from(WasteRecordRow).join(model, model.id == column)), filters))
+    rows = db.execute(statement.group_by(model.name).order_by(value.desc(), model.name))
+    return [(name, float(weight), float(worth)) for name, weight, worth in rows]
 
 
 def list_record_notes(db: Session, *, limit: int) -> list[tuple[str, str]]:
@@ -331,7 +374,7 @@ def reason_id_named(db: Session, name: str) -> int:
 def create_meal_check(db: Session, *, event_at: datetime, meal_type: str, food_item: str,
                       count_label: str, start_count: int, end_count: int, short_count: int,
                       kg_per_piece: float, guest_count: int, area_id: int, reason_id: int,
-                      user_id: int) -> tuple[MealCheck, WasteRecord | None, WasteRecord | None]:
+                      user_id: int, category_id: int | None = None) -> tuple[MealCheck, WasteRecord | None, WasteRecord | None]:
     """Save a meal check, plus a waste record for the leftovers and one for any shortage.
 
     The waste records hold only a reference to the meal check in their notes, so the forecast
@@ -342,13 +385,13 @@ def create_meal_check(db: Session, *, event_at: datetime, meal_type: str, food_i
     if end_count > 0:
         leftovers = create_waste_record(
             db, event_at=event_at, area_id=area_id, reason_id=reason_id,
-            quantity_kg=end_count * kg_per_piece, user_id=user_id,
+            quantity_kg=end_count * kg_per_piece, user_id=user_id, category_id=category_id,
             notes=json.dumps({"source": "photo count", "item": food_item, "label": count_label, "meal": meal_type,
                               "start": start_count, "end": end_count}))
     if short_count > 0:
         shortage = create_waste_record(
             db, event_at=event_at, area_id=area_id, reason_id=reason_id_named(db, SHORTAGE_REASON),
-            quantity_kg=short_count * kg_per_piece, user_id=user_id,
+            quantity_kg=short_count * kg_per_piece, user_id=user_id, category_id=category_id,
             notes=json.dumps({"source": "photo count", "item": food_item, "label": count_label, "meal": meal_type,
                               "short": short_count}))
     row = MealCheckRow(

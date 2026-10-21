@@ -29,3 +29,8 @@
 .dw-average-label { fill: #3f5a4e; font-size: 12px; font-weight: 700; }
 .dw-table { margin-top: 12px; }
 .dw-table summary { cursor: pointer; color: var(--leaf-dark); font-weight: 700; }
+
+.dw-mode { display: inline-flex; gap: 4px; margin: 0 0 12px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--linen); }
+.dw-mode button { padding: 7px 14px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: .88rem; font-weight: 700; cursor: pointer; }
+.dw-mode button:hover { color: var(--ink); }
+.dw-mode button[aria-pressed="true"] { background: var(--sheet); color: var(--ink); box-shadow: 0 1px 4px rgba(6, 78, 59, .14); }

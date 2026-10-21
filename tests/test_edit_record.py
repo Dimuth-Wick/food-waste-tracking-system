@@ -4,6 +4,7 @@ import pytest
 
 from app.database.queries import create_user, create_waste_record, get_waste_record
 from app.database.seed import seed_demo_data
+from app.database.prices import ensure_price_data
 from conftest import client, database, make_app, scalar, sql
 
 
@@ -17,9 +18,11 @@ def app_with_demo(tmp_path):
 
 def form_for(app, *, quantity="3.5"):
     with database(app) as db:
+        ensure_price_data(db)
         return {
             "event_at": "2026-10-02T15:45",
             "area_id": str(scalar(db, "SELECT id FROM areas WHERE name = 'Buffet'")),
+            "category_id": str(scalar(db, "SELECT id FROM categories WHERE name = 'Fried rice'")),
             "reason_id": str(scalar(db, "SELECT id FROM reasons WHERE name = 'Spoilage'")),
             "quantity_kg": quantity,
         }

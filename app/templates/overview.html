@@ -5,7 +5,7 @@
 <section class="page-heading">
   <div>
     <h1>Waste overview</h1>
-    <p class="page-description">How much food has been thrown away, where it comes from, and every record behind the totals. All weights are in kilograms.</p>
+    <p class="page-description">What the food thrown away has cost, where it comes from, and every record behind the totals. Values are approximate, worked out from each food's price per kilogram.</p>
   </div>
   <a class="button button-primary" href="{{ add_url }}">+ Add waste record</a>
 </section>
@@ -23,26 +23,27 @@
 {% if summary %}
 <section class="summary-band" aria-label="Waste summary">
   <article class="summary-item summary-item-total">
-    <span class="summary-label">Total recorded</span>
-    <div class="summary-value">{{ "%.2f"|format(summary.total_kg) }}<span>kg</span></div>
-    <p>{{ summary.record_count }} {{ 'record' if summary.record_count == 1 else 'records' }}{% if has_filters %} matching filters{% endif %}</p>
+    <span class="summary-label">Waste value</span>
+    <div class="summary-value"><span class="cur">{{ CURRENCY_SYMBOL }}</span> {{ summary.total_value|amount }}</div>
+    <p>≈ {{ "%.2f"|format(summary.total_kg) }} kg · {{ summary.record_count }} {{ 'record' if summary.record_count == 1 else 'records' }}{% if has_filters %} matching filters{% endif %}</p>
   </article>
   <article class="summary-item">
     <span class="summary-label">Today</span>
-    <div class="summary-value">{{ "%.2f"|format(summary.today_kg) }}<span>kg</span></div>
-    <p>Sri Lanka calendar day</p>
+    <div class="summary-value"><span class="cur">{{ CURRENCY_SYMBOL }}</span> {{ summary.today_value|amount }}</div>
+    <p>{{ "%.2f"|format(summary.today_kg) }} kg · Sri Lanka calendar day</p>
   </article>
   <article class="summary-item">
     <span class="summary-label">This week</span>
-    <div class="summary-value">{{ "%.2f"|format(summary.week_kg) }}<span>kg</span></div>
-    <p>Monday through today</p>
+    <div class="summary-value"><span class="cur">{{ CURRENCY_SYMBOL }}</span> {{ summary.week_value|amount }}</div>
+    <p>{{ "%.2f"|format(summary.week_kg) }} kg · Monday through today</p>
   </article>
   <article class="summary-item">
     <span class="summary-label">This month</span>
-    <div class="summary-value">{{ "%.2f"|format(summary.month_kg) }}<span>kg</span></div>
-    <p>Month start through today</p>
+    <div class="summary-value"><span class="cur">{{ CURRENCY_SYMBOL }}</span> {{ summary.month_value|amount }}</div>
+    <p>{{ "%.2f"|format(summary.month_kg) }} kg · Month start through today</p>
   </article>
 </section>
+<p class="value-note">Values are estimates: kilograms × an approximate price per kg for each food, in {{ CURRENCY_SYMBOL }}. <a class="text-link" href="{{ url_for('food_prices') }}">Review the food prices</a></p>
 
 {% if summary.record_count %}
 <section class="sheet" aria-labelledby="daily-title">
@@ -50,7 +51,7 @@
     <h2 id="daily-title">Waste each day, last 30 days</h2>
     <span class="sheet-note">Follows the area and reason filters</span>
   </div>
-  <div id="daily-waste-root" class="daily-waste-root" data-settings="{{ {'days': daily}|tojson|forceescape }}">
+  <div id="daily-waste-root" class="daily-waste-root" data-settings="{{ {'days': daily, 'currency': CURRENCY_SYMBOL}|tojson|forceescape }}">
     <noscript><p class="empty-note">This chart needs JavaScript. The records below show the same figures.</p></noscript>
   </div>
 </section>
@@ -58,18 +59,18 @@
 
 <section class="sheet" aria-labelledby="breakdown-title">
   <div class="sheet-heading">
-    <h2 id="breakdown-title">Where the waste comes from</h2>
-    <span class="sheet-note">Largest source highlighted</span>
+    <h2 id="breakdown-title">Where the waste cost comes from</h2>
+    <span class="sheet-note">Most costly highlighted</span>
   </div>
   <div class="breakdown-columns">
-    {% for title, items in [('area', summary.area_breakdown), ('reason', summary.reason_breakdown)] %}
+    {% for title, items in [('area', summary.area_breakdown), ('food', summary.food_breakdown), ('reason', summary.reason_breakdown)] %}
     <section class="breakdown" aria-labelledby="{{ title }}-title">
       <h3 id="{{ title }}-title">By {{ title }}</h3>
       <div class="bar-list">
         {% for item in items %}
         <div class="bar-item">
-          <div class="bar-caption"><span>{{ item.name }}</span><strong>{{ "%.2f"|format(item.quantity_kg) }} kg</strong></div>
-          <div class="bar-track" role="img" aria-label="{{ item.name }}: {{ '%.2f'|format(item.quantity_kg) }} kilograms"><span class="bar-fill" style="width: {{ '%.1f'|format(item.percent) }}%"></span></div>
+          <div class="bar-caption"><span>{{ item.name }} <small>{{ "%.2f"|format(item.quantity_kg) }} kg</small></span><strong>{{ item.value|money }}</strong></div>
+          <div class="bar-track" role="img" aria-label="{{ item.name }}: {{ '%.2f'|format(item.quantity_kg) }} kilograms, about {{ item.value|money }}"><span class="bar-fill" style="width: {{ '%.1f'|format(item.percent) }}%"></span></div>
         </div>
         {% endfor %}
       </div>
@@ -90,14 +91,14 @@
   <div class="table-scroll">
     <table class="day-table">
       <thead>
-        <tr><th scope="col">Date</th><th scope="col" class="numeric">Thrown away</th><th scope="col" class="numeric">Ran out</th><th scope="col">Meals</th><th scope="col" class="numeric">Records</th><th scope="col"><span class="visually-hidden">Details</span></th></tr>
+        <tr><th scope="col">Date</th><th scope="col" class="numeric">Waste value</th><th scope="col" class="numeric">Ran out</th><th scope="col">Meals</th><th scope="col" class="numeric">Records</th><th scope="col"><span class="visually-hidden">Details</span></th></tr>
       </thead>
       <tbody>
         {% for day in days %}
         <tr class="day-row{% if notice and notice.record.id in day.records|map(attribute='id')|list %} is-new{% endif %}" data-href="{{ day.url }}">
           <td><a class="day-link" href="{{ day.url }}">{{ day.date }}</a></td>
-          <td class="numeric"><strong class="day-waste">{{ "%.2f"|format(day.waste_kg) }} kg</strong></td>
-          <td class="numeric">{% if day.short_kg %}<span class="weight weight-short">−{{ "%.2f"|format(day.short_kg) }} kg</span>{% else %}<span class="muted-dash">–</span>{% endif %}</td>
+          <td class="numeric"><strong class="day-waste">{{ day.waste_value|money }}</strong><span class="cell-secondary">{{ "%.2f"|format(day.waste_kg) }} kg</span></td>
+          <td class="numeric">{% if day.short_kg %}<span class="weight weight-short">−{{ "%.2f"|format(day.short_kg) }} kg</span><span class="cell-secondary">{{ day.short_value|money }}</span>{% else %}<span class="muted-dash">–</span>{% endif %}</td>
           <td><span class="meal-dots">{% for meal in day.meals %}<span class="meal-dot{% if meal.records %} is-on{% endif %}" title="{{ meal.name }}: {{ meal.records|length }} {{ 'record' if meal.records|length == 1 else 'records' }}">{{ meal.name[0] }}</span>{% endfor %}</span></td>
           <td class="numeric">{{ day.records|length }}</td>
           <td class="numeric"><a class="text-link" href="{{ day.url }}" aria-label="Details for {{ day.date }}">Details</a></td>

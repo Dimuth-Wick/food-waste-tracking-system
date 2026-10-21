@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.camera.store import combined_counts, ensure_camera_tables, foods_for
+from app.database.prices import FALLBACK_PRICE, food_for_camera, price_map
 from app.database.queries import SHORTAGE_REASON, create_meal_check
 from app.database.tables import CameraFoodRow, CaptureCountRow, CaptureRow, MealCheckDraftRow
 
@@ -62,11 +63,14 @@ def _photo(row: CaptureRow, counts: dict, detections: list, directory: Path, pho
     }
 
 
-def _food_lines(start: dict, end: dict, foods: list[CameraFoodRow]) -> list[dict]:
-    """One line per food the station looks for: the start and end counts and what they weigh."""
+def _food_lines(db: Session, start: dict, end: dict, foods: list[CameraFoodRow]) -> list[dict]:
+    """One line per food the station looks for: the start and end counts, what a piece weighs and what a kg costs."""
+    pricing = price_map(db)
     lines = []
     for food in foods:
+        category = food_for_camera(db, food.count_label, food.dish)
         lines.append({"label": food.count_label, "dish": food.dish, "kgPerPiece": food.kg_per_piece,
+                      "pricePerKg": pricing["prices"].get(category.id, pricing["mixed"]),
                       "start": start.get(food.count_label, 0), "end": end.get(food.count_label, 0)})
     return lines
 
@@ -125,7 +129,7 @@ def _draft_view(db: Session, draft: MealCheckDraftRow, sides: dict) -> dict:
         view.update(json.loads(draft.details or "{}"))
         return view
     foods = foods_for(db, draft.station)
-    view["foods"] = _food_lines(sides["start"]["combined"] or {}, sides["end"]["combined"] or {}, foods)
+    view["foods"] = _food_lines(db, sides["start"]["combined"] or {}, sides["end"]["combined"] or {}, foods)
     return view
 
 
@@ -190,19 +194,22 @@ def confirm_draft(db: Session, draft_id: int, data: dict, settings, *, lookups, 
     end_time = settings["MEAL_SCHEDULE"].get(draft.meal_type, {}).get("end", "23:59")
     ended = datetime.fromisoformat(f"{draft.capture_date}T{end_time}").replace(tzinfo=ZoneInfo(settings["TIMEZONE"]))
     saved, waste_ids, summary = [], [], []
+    pricing = price_map(db)
     for food, start, end, short in lines:
         if not (start or short):
             continue
+        category = food_for_camera(db, food.count_label, food.dish)
         check, leftovers, shortage = create_meal_check(
             db, event_at=ended, meal_type=draft.meal_type.capitalize(), food_item=food.dish or food.count_label.capitalize(),
             count_label=food.count_label, start_count=start, end_count=end, short_count=short,
             kg_per_piece=food.kg_per_piece, guest_count=guests, area_id=data["area_id"], reason_id=data["reason_id"],
-            user_id=actor.id)
+            user_id=actor.id, category_id=category.id)
         saved.append(check.id)
         waste_ids += [record.id for record in (leftovers, shortage) if record]
+        price = pricing["prices"].get(category.id, pricing["mixed"])
         summary.append({"label": food.count_label, "dish": food.dish, "start": start, "end": end, "short": short,
                         "eatenKg": round(check.eaten_kg, 3), "wasteKg": round(end * food.kg_per_piece, 3),
-                        "shortKg": round(short * food.kg_per_piece, 3)})
+                        "shortKg": round(short * food.kg_per_piece, 3), "wasteValue": round(end * food.kg_per_piece * price)})
 
     draft.status, draft.confirmed_at = "confirmed", _now_text()
     draft.meal_check_ids = json.dumps(saved)

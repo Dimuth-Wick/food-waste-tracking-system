@@ -12,8 +12,8 @@ from app.database.queries import MAX_ID, SHORTAGE_REASON, RecordFilters, list_lo
 # The demo hotel is in Sri Lanka; dates on screen use Sri Lanka local time.
 DEMO_TIMEZONE = timezone(timedelta(hours=5, minutes=30))
 DEMO_USERNAME = "demo_entry"
-LOOKUPS = ("areas", "reasons")
-FILTER_FIELDS = ("start_date", "end_date", "area_id", "reason_id")
+LOOKUPS = ("areas", "categories", "reasons")
+FILTER_FIELDS = ("start_date", "end_date", "area_id", "category_id", "reason_id")
 
 
 def parse_id(raw: str) -> int | None:
@@ -66,7 +66,8 @@ def parse_filters(values: dict[str, str], lookups) -> tuple[dict[str, str], Reco
         errors["end_date"] = "To date must be on or after From date."
 
     ids = {}
-    for field, label, table in (("area_id", "area", "areas"), ("reason_id", "reason", "reasons")):
+    for field, label, table in (("area_id", "area", "areas"), ("category_id", "food", "categories"),
+                                ("reason_id", "reason", "reasons")):
         raw = values[field]
         if raw:
             if (parsed := parse_id(raw)) not in {item.id for item in lookups[table]}:

@@ -15,7 +15,7 @@ def _prepare_database(app):
 
 
 def _form(quantity="2.5"):
-    return {"event_at": "2026-10-02T12:30", "area_id": "1",
+    return {"event_at": "2026-10-02T12:30", "area_id": "1", "category_id": "1",
             "reason_id": "1", "quantity_kg": quantity}
 
 

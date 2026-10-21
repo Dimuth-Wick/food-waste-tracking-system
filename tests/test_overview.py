@@ -4,6 +4,7 @@ import pytest
 
 from app.database.queries import create_user, create_waste_record
 from app.waste_records.common import DEMO_TIMEZONE
+from app.database.prices import ensure_price_data
 from conftest import add_lookups, client, database, make_app, scalar, sql
 
 
@@ -57,11 +58,14 @@ def test_overview_uses_stored_rows_and_local_calendar_boundaries(overview_app):
         add_record(app, user_id, ids, when, kg, area, category, reason)
 
     html = client(app).get("/").text
-    for label, value in (("Total recorded", "28.00"), ("Today", "11.00"),
+    for label, value in (("Waste value", "28.00"), ("Today", "11.00"),
                          ("This week", "20.00"), ("This month", "15.00")):
         assert label in html
-        assert value in html
+        assert value in html                                  # the kilograms are still shown under each value
     assert "7 records" in html
+    # Vegetables 15 kg at Rs 350 and Bakery 13 kg at Rs 900: the money leads, and food is a breakdown too.
+    assert "16,950" in html and "Rs 11,700" in html and "Rs 5,250" in html
+    assert 'aria-label="Bakery: 13.00 kilograms, about Rs 11,700"' in html
     assert "Kitchen: 16.00 kilograms" in html
     assert "Buffet: 12.00 kilograms" in html
     assert "Spoilage: 15.00 kilograms" in html
@@ -109,7 +113,11 @@ def test_one_set_of_filters_drives_totals_and_records(overview_app):
     bad_reason = browser.get("/?reason_id=999")
     assert bad_reason.status_code == 400
     assert "Select a valid reason" in bad_reason.text
-    assert "category" not in browser.get("/").text.lower()   # records are whole-waste, no food category
+    page = browser.get("/").text
+    assert "All foods" in page and 'name="category_id"' in page             # records can be filtered by food
+    by_food = browser.get(f"/?category_id={ids['categories']['Bakery']}").text
+    assert "1 record matching filters" in by_food and "Rs 7,200" in by_food     # 8 kg of Bakery at Rs 900
+    assert browser.get("/?category_id=999").status_code == 400
 
 
 def test_record_row_shows_local_time_user_and_edit_link(overview_app):
@@ -182,11 +190,12 @@ def test_shortages_stay_out_of_waste_totals_and_go_below_zero_on_the_daily_chart
         create_waste_record(db, event_at=datetime(2026, 10, 1, 20, 0, tzinfo=DEMO_TIMEZONE),
                             area_id=ids["areas"]["Kitchen"], category_id=ids["categories"]["Vegetables"],
                             reason_id=short_id, quantity_kg=3, user_id=user_id)
+        ensure_price_data(db)               # the prices the app sets up before showing any page
         days = build_daily(db, RecordFilters(), date(2026, 10, 2))
 
     assert len(days) == 30 and days[0]["date"] == "2026-09-03" and days[-1]["date"] == "2026-10-02"
-    assert days[-2] == {"date": "2026-10-01", "waste": 4.0, "short": 3.0}
-    assert days[-1] == {"date": "2026-10-02", "waste": 2.0, "short": 0.0}
+    assert days[-2] == {"date": "2026-10-01", "waste": 4.0, "short": 3.0, "waste_value": 1400, "short_value": 1050}
+    assert days[-1] == {"date": "2026-10-02", "waste": 2.0, "short": 0.0, "waste_value": 700, "short_value": 0}
     assert sum(d["waste"] for d in days) == 6.0
 
     page = client(app).get("/").text
