@@ -9,7 +9,10 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
+from app import auth
 from app.camera import views as camera
 from app.camera.capture import CaptureService
 from app.camera.schedule import start_scheduler, stop_scheduler
@@ -24,6 +27,7 @@ from app.web import RequestSizeLimit, install_error_handlers
 
 
 ROUTERS = (
+    auth.router,                                                                  # sign in and out
     overview.router, add_record.router, edit_record.router,                       # waste records
     forecast.router,                                                              # meal forecast
     counting.router, meal_check.router,                                           # food counting
@@ -61,7 +65,12 @@ def create_app(config=None) -> FastAPI:
     app.state.session_factory = make_session_factory(app.state.engine)
     forecast_model.init_app(app)
 
+    app.state.login_limiter = auth.AttemptLimiter(settings["LOGIN_MAX_ATTEMPTS"], settings["LOGIN_LOCK_MINUTES"])
     app.add_middleware(RequestSizeLimit)
+    # Added last = runs first: the session cookie is read before the access check needs it.
+    app.add_middleware(BaseHTTPMiddleware, dispatch=auth.require_sign_in)
+    app.add_middleware(SessionMiddleware, secret_key=settings["SECRET_KEY"], session_cookie="wastewise_session",
+                       max_age=settings["REMEMBER_DAYS"] * 86400, same_site="lax", https_only=False)
     install_error_handlers(app)
     app.mount("/static", StaticFiles(directory=Path(__file__).with_name("static")), name="static")
     for router in ROUTERS:

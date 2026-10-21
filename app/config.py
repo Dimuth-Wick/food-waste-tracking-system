@@ -16,16 +16,26 @@ PHOTOS_PER_CAPTURE Photos per capture when there is a single camera (default 4).
 CAPTURE_TEST_MODE  Set to 1 to ignore the meal times and capture every 15 seconds.
 CAPTURE_TEST_SECONDS Seconds between captures in test mode (default 15).
 CAPTURE_DIR        Where photos are saved. Default instance/captures.
+
+Sign-in (see README, "Signing in"):
+REQUIRE_LOGIN      Managers and administrators must sign in. Default on; set to 0 to turn it off.
+SECRET_KEY         Signs the sign-in cookie. Default: a random key created once in instance/secret_key.
+SESSION_HOURS      How long a normal sign-in lasts. Default 8.
+REMEMBER_DAYS      How long "Keep me signed in" lasts. Default 30.
+LOGIN_MAX_ATTEMPTS Wrong passwords allowed before a short lock. Default 5.
+LOGIN_LOCK_MINUTES How long that lock lasts. Default 15.
 """
 
 import os
 import re
+import secrets
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DATABASE = PROJECT_ROOT / "instance" / "food_waste.sqlite3"
 DEFAULT_CAPTURE_DIR = PROJECT_ROOT / "instance" / "captures"
+SECRET_KEY_FILE = PROJECT_ROOT / "instance" / "secret_key"
 
 DEFAULT_TIMEZONE = "Asia/Colombo"
 # Lunch and dinner are placeholders until the kitchen confirms its real times.
@@ -99,6 +109,28 @@ def _flag(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _default_on(name: str) -> bool:
+    """A flag that is on unless the environment says 0, false, no or off."""
+    return os.environ.get(name, "").strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _secret_key(testing: bool) -> str:
+    """The key that signs the sign-in cookie: from SECRET_KEY, else created once and kept in instance/."""
+    if os.environ.get("SECRET_KEY"):
+        return os.environ["SECRET_KEY"]
+    if testing:
+        return "test-secret-key-not-for-real-use"
+    try:
+        if SECRET_KEY_FILE.is_file() and SECRET_KEY_FILE.read_text(encoding="utf-8").strip():
+            return SECRET_KEY_FILE.read_text(encoding="utf-8").strip()
+        SECRET_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        key = secrets.token_urlsafe(48)
+        SECRET_KEY_FILE.write_text(key, encoding="utf-8")
+        return key
+    except OSError:  # a read-only folder: a key for this run only, so people sign in again after a restart
+        return secrets.token_urlsafe(48)
+
+
 def load_settings(overrides=None):
     """Return the settings dict. Tests pass overrides, such as a temporary DATABASE.
 
@@ -121,6 +153,11 @@ def load_settings(overrides=None):
         "CAPTURE_TEST_MODE": _flag("CAPTURE_TEST_MODE"),
         "CAPTURE_TEST_SECONDS": os.environ.get("CAPTURE_TEST_SECONDS", DEFAULT_TEST_SECONDS),
         "CAPTURE_DIR": os.environ.get("CAPTURE_DIR", str(DEFAULT_CAPTURE_DIR)),
+        "REQUIRE_LOGIN": _default_on("REQUIRE_LOGIN"),
+        "SESSION_HOURS": os.environ.get("SESSION_HOURS", 8),
+        "REMEMBER_DAYS": os.environ.get("REMEMBER_DAYS", 30),
+        "LOGIN_MAX_ATTEMPTS": os.environ.get("LOGIN_MAX_ATTEMPTS", 5),
+        "LOGIN_LOCK_MINUTES": os.environ.get("LOGIN_LOCK_MINUTES", 15),
     }
     overrides = dict(overrides or {})
     # Shortcut for tests and scripts: a plain SQLite file path.
@@ -130,7 +167,11 @@ def load_settings(overrides=None):
 
     settings["MEAL_SCHEDULE"] = parse_meal_schedule(settings["MEAL_SCHEDULE"])
     settings["CAMERA_SOURCES"] = parse_camera_sources(settings["CAMERA_SOURCES"])
-    for key, low, high in (("PHOTOS_PER_CAPTURE", 1, 10), ("CAPTURE_TEST_SECONDS", 1, 3600)):
+    if not settings.get("SECRET_KEY"):
+        settings["SECRET_KEY"] = _secret_key(bool(settings.get("TESTING")))
+    for key, low, high in (("PHOTOS_PER_CAPTURE", 1, 10), ("CAPTURE_TEST_SECONDS", 1, 3600),
+                           ("SESSION_HOURS", 1, 24 * 14), ("REMEMBER_DAYS", 1, 365),
+                           ("LOGIN_MAX_ATTEMPTS", 1, 100), ("LOGIN_LOCK_MINUTES", 1, 1440)):
         try:
             settings[key] = int(settings[key])
         except (TypeError, ValueError):

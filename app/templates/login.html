@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#064e3b">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%23064e3b%27/%3E%3Crect x=%277%27 y=%2716%27 width=%275%27 height=%279%27 rx=%272%27 fill=%27%2318755a%27/%3E%3Crect x=%2713.5%27 y=%2710%27 width=%275%27 height=%2715%27 rx=%272%27 fill=%27%23ff7a1a%27/%3E%3Crect x=%2720%27 y=%2713%27 width=%275%27 height=%2712%27 rx=%272%27 fill=%27%2318755a%27/%3E%3C/svg%3E">
+    <title>Sign in · Wastewise</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
+  </head>
+  <body class="login-body">
+    <main class="login">
+
+      <section class="login-hero" aria-labelledby="hero-title">
+        <div class="hero-brand">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <strong>Wastewise</strong>
+        </div>
+
+        {# The picture is decoration: sample numbers, drawn with CSS and SVG, hidden from screen readers. #}
+        <div class="stage" aria-hidden="true">
+          <div class="drift drift-a"></div>
+          <div class="drift drift-b"></div>
+
+          <div class="float float-chart">
+            <div class="card chart-card">
+              <div class="chart-head">
+                <span>Waste this week</span>
+                <em>Sample data</em>
+              </div>
+              <p class="chart-total"><span class="count count-kg"></span><small>kg</small></p>
+              <svg class="chart" viewBox="0 0 280 128" role="presentation">
+                <line class="axis" x1="0" y1="98" x2="280" y2="98" />
+                <line class="avg" x1="0" y1="62" x2="280" y2="62" />
+                <g class="bars">
+                  <rect class="bar" style="--i:0" x="10"  y="48" width="26" height="50" rx="6" />
+                  <rect class="bar" style="--i:1" x="48"  y="30" width="26" height="68" rx="6" />
+                  <rect class="bar" style="--i:2" x="86"  y="64" width="26" height="34" rx="6" />
+                  <rect class="bar" style="--i:3" x="124" y="40" width="26" height="58" rx="6" />
+                  <rect class="bar" style="--i:4" x="162" y="22" width="26" height="76" rx="6" />
+                  <rect class="bar short" style="--i:5" x="200" y="98" width="26" height="20" rx="6" />
+                  <rect class="bar" style="--i:6" x="238" y="56" width="26" height="42" rx="6" />
+                </g>
+                <path class="forecast" pathLength="1" d="M23 70 C 60 40, 88 82, 137 54 S 200 38, 251 74" />
+                <circle class="forecast-dot" cx="251" cy="74" r="5" />
+                <circle class="forecast-ring" cx="251" cy="74" r="5" />
+              </svg>
+            </div>
+          </div>
+
+          <div class="float float-tray">
+            <div class="card tray-card">
+              <div class="tray">
+                <span class="plate" style="--i:0"><b>1</b></span>
+                <span class="plate" style="--i:1"><b>2</b></span>
+                <span class="plate" style="--i:2"><b>3</b></span>
+                <span class="plate" style="--i:3"><b>4</b></span>
+                <span class="plate" style="--i:4"><b>5</b></span>
+                <span class="plate" style="--i:5"><b>6</b></span>
+              </div>
+              <p class="tray-count"><span class="count count-pieces"></span> cupcakes counted</p>
+            </div>
+          </div>
+
+          <div class="float float-pill">
+            <div class="pill"><span class="pill-dot"></span>Forecast on target</div>
+          </div>
+        </div>
+
+        <div class="hero-copy">
+          <h2 id="hero-title">Cook for the guests you'll have.</h2>
+          <p>Wastewise tracks what is thrown away, counts the buffet from camera photos, and forecasts the next meal.</p>
+        </div>
+      </section>
+
+      <section class="login-panel" aria-labelledby="login-title">
+        <div class="login-card">
+          <header class="reveal" style="--d:0">
+            <h1 id="login-title">Manager sign in</h1>
+            <p>Sign in to see this hotel's food waste, buffet counts and meal forecasts.</p>
+          </header>
+
+          <form id="login-form" class="login-form{% if error %} has-error{% endif %}" method="post" action="{{ url_for('sign_in') }}" novalidate>
+            <input type="hidden" name="next" value="{{ next_url }}">
+
+            {% if notice %}<p class="login-notice reveal" style="--d:1" role="status">{{ notice }}</p>{% endif %}
+            {% if error %}<p class="login-error" id="login-error" role="alert"{% if wait %} data-wait="{{ wait }}"{% endif %}>{{ error }}</p>{% endif %}
+
+            <div class="field reveal" style="--d:1">
+              <label for="username">Username</label>
+              <div class="control">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.2-4 4.2-6 8-6s6.8 2 8 6"/></svg>
+                <input id="username" name="username" value="{{ username }}" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="80" required{% if error %} aria-invalid="true" aria-describedby="login-error"{% endif %}>
+              </div>
+            </div>
+
+            <div class="field reveal" style="--d:2">
+              <label for="password">Password</label>
+              <div class="control">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                <input id="password" name="password" type="password" autocomplete="current-password" maxlength="200" required{% if error %} aria-invalid="true" aria-describedby="login-error"{% endif %}>
+                <button class="reveal-password" type="button" hidden aria-label="Show password" aria-pressed="false">
+                  <svg class="eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg class="eye-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 6.2A10.7 10.7 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.4 7.6A16.6 16.6 0 0 0 2 12s3.6 7 10 7a9.8 9.8 0 0 0 4.2-.9M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+                </button>
+              </div>
+              <p class="caps-hint" hidden role="status">Caps Lock is on</p>
+            </div>
+
+            <label class="remember reveal" style="--d:3">
+              <input type="checkbox" name="remember" value="1">
+              <span class="box" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg></span>
+              <span>Keep me signed in for {{ remember_days }} days</span>
+            </label>
+
+            <button class="submit reveal" style="--d:4" type="submit">
+              <span class="submit-label">Sign in</span>
+              <span class="spinner" aria-hidden="true"></span>
+              <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+          </form>
+
+          <p class="login-help reveal" style="--d:5">Managers and administrators only. Need access or a new password? Ask your hotel administrator.</p>
+        </div>
+      </section>
+    </main>
+    <script src="{{ url_for('static', filename='login.js') }}" defer></script>
+  </body>
+</html>

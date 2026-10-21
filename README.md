@@ -96,6 +96,7 @@ Confirming a meal check, for each food that was put out:
 | Edit record | `/records/<id>/edit` | Opens the overview with the edit panel showing |
 | Day page | `/days/<date>` | One day's records by meal |
 | Meal forecast | `/forecast` | Forecast and past accuracy (React) |
+| Sign in | `/login` | Manager sign-in (public); `POST /logout` signs out |
 | Food counting | `/food-counting` | Camera photos by day and meal, counts, meal checks to confirm, the food list (React) |
 | API docs | `/docs` | Try the JSON APIs |
 
@@ -120,7 +121,7 @@ Confirming a meal check, for each food that was put out:
 | Forecast model | scikit-learn pipeline (one-hot encoding and linear regression), saved with joblib |
 | Food counting model | [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) with PyTorch and Hugging Face Transformers |
 | Camera capture | OpenCV (reads the camera stream), APScheduler (meal times) |
-| Tests | pytest (85 tests) |
+| Tests | pytest (121 tests) |
 | Version control | Git, GitHub (`main` for stable work, `dev` for practice) |
 
 ## 🤖 Machine learning
@@ -152,7 +153,7 @@ py -3.12 -m venv .venv
 Then open <http://127.0.0.1:5000/>. On macOS or Linux, use `python -m venv .venv` and `.venv/bin/python` instead.
 
 - **The first start** needs `ml_models/food_demand_model.pkl`. Set `ML_MODEL_SKIP=1` to start without the forecast model.
-- **No login:** this prototype has no sign-in. Everything is recorded as the demo kitchen staff user, and only that user's records can be edited.
+- **Sign-in:** managers and administrators sign in at `/login` (see [Signing in](#-signing-in)). Set a password for the demo manager first: `.venv\Scripts\python.exe scripts/set_password.py demo_manager --generate`.
 - **Demo data:** `scripts/seed_demo_history.py` adds 30 days of demo records (a waste record for each of 5 dishes per day, some shortages, and the matching meal history) so the charts and forecast accuracy have something to show. It writes to your real database; run it with `--remove` to take the demo records out again.
 
 ### Run the tests
@@ -213,6 +214,30 @@ Or press **Start photos** / **End photos** on the Food counting page, or call `P
 
 **6. Counting.** Photos are counted one at a time in the background, so the pages and the schedule never wait. The model loads once, on the first photo, which takes about a minute; after that each photo takes some seconds. A station with no foods on its list shows "No foods set up" and nothing is counted.
 
+## 🔐 Signing in
+
+The app is for hotel **managers and administrators**. Everything except the sign-in page needs a sign-in. Visitors are sent to the **Manager sign in** page (`/login`) and come back to the page they asked for afterwards. The page has an animated picture of what Wastewise does (it stands still for people who ask their system for reduced motion) and a form with a show/hide password button, a Caps Lock warning, and clear messages.
+
+- **Who can sign in:** users with the role `manager` or `admin`. Kitchen staff (`entry`) and switched-off accounts cannot. The top bar shows who is signed in and a **Sign out** button.
+- **Records are saved in the signed-in manager's name**, and managers can edit anyone's records.
+- **How long it lasts:** 8 hours, or 30 days with **Keep me signed in** (`SESSION_HOURS`, `REMEMBER_DAYS`). Changing a user's password, or switching the account off, signs them out at once.
+- **Guessing is slowed down:** after 5 wrong passwords (`LOGIN_MAX_ATTEMPTS`) that username is locked for 15 minutes (`LOGIN_LOCK_MINUTES`), and one address cannot try many usernames in a row. The error never says whether the username or the password was wrong, and a wrong username takes as long to answer as a wrong password. The lock is kept in memory, so it starts again if the app restarts.
+- **The cookie** is signed with `SECRET_KEY` (created once in `instance/secret_key` if you do not set one), is HttpOnly and SameSite=Lax, and holds only a user number, an end time and a password fingerprint. Pages are sent with `Cache-Control: no-store`, so Back after signing out does not show them again. The sign-in cookie is not marked Secure because the app runs on `http://127.0.0.1`; behind HTTPS, put it behind a proxy that does TLS.
+- **Turn it off** for local experiments with `REQUIRE_LOGIN=0`: no sign-in is needed and everything is recorded as the demo kitchen user, as before.
+
+**Give someone a password, or add a manager:**
+
+```powershell
+# a new password for an existing user (asks you to type it twice)
+.venv\Scripts\python.exe scripts/set_password.py demo_manager
+# make one up and print it once
+.venv\Scripts\python.exe scripts/set_password.py demo_manager --generate
+# add a manager (or --role admin)
+.venv\Scripts\python.exe scripts/set_password.py anna --create --name "Anna Perera" --role manager
+```
+
+Passwords need at least 8 characters and are stored only as hashes. The demo users made by `scripts/init_db.py --seed` (`demo_manager`, `demo_admin`) print one-time passwords when they are created.
+
 ## 🗄️ Database
 
 SQLAlchemy lets the app run on the local SQLite file by default, and on PostgreSQL by changing one setting.
@@ -244,6 +269,10 @@ SQLAlchemy lets the app run on the local SQLite file by default, and on PostgreS
 | `PHOTOS_PER_CAPTURE` | `4` | Photos per capture when there is one camera |
 | `CAPTURE_TEST_MODE` | not set | `1` captures every 15 seconds (`CAPTURE_TEST_SECONDS`) instead of at meal times |
 | `CAPTURE_DIR` | `instance/captures` | Where camera photos are saved |
+| `REQUIRE_LOGIN` | on | `0` turns the sign-in off |
+| `SECRET_KEY` | created in `instance/secret_key` | Signs the sign-in cookie |
+| `SESSION_HOURS` / `REMEMBER_DAYS` | `8` / `30` | How long a sign-in lasts |
+| `LOGIN_MAX_ATTEMPTS` / `LOGIN_LOCK_MINUTES` | `5` / `15` | Wrong passwords allowed, and how long the lock lasts |
 
 To use PostgreSQL:
 
@@ -288,7 +317,7 @@ Where to start:
 
 ## ⚠️ Limitations
 
-- It is a local prototype: no login or roles, and one demo user records everything.
+- It is a local prototype: sign-in is for managers and administrators only, there is no password reset page (use `scripts/set_password.py`), and the sign-in cookie is not marked Secure.
 - Forecasts cover the 17 dishes and 3 meals the model was trained on.
 - Counting needs a photo of separate items from above, and the weight per piece is entered by staff rather than measured from the photo.
 - The cameras only find foods on the list; the counting model cannot name a food it was not told about.
@@ -309,7 +338,8 @@ Where to start:
 - [x] Capture photos automatically from buffet cameras at set times.
 - [ ] Fine-tune the counting model with the saved camera photos.
 - [ ] Estimate food weight directly from photos.
-- [ ] Add login and roles for kitchen staff, supervisors and administrators.
+- [x] Manager sign-in with sessions, password protection and an animated sign-in page.
+- [ ] Roles for kitchen staff (limited access), a password-reset page and per-user audit history.
 - [ ] Track leftover food reused in later meals.
 - [ ] Retrain the forecast model from saved records.
 - [ ] Test with PostgreSQL and realistic hotel scenarios.

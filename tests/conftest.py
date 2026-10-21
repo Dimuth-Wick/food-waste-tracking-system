@@ -11,7 +11,8 @@ from app.database.connection import init_db
 
 def make_app(tmp_path, name="test.sqlite3", *, initialize=True, **config):
     """A test app using its own SQLite file. Tables are created unless initialize=False."""
-    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / name), **config})
+    # Sign-in is off in tests unless a test turns it on (REQUIRE_LOGIN=True).
+    app = create_app({"TESTING": True, "REQUIRE_LOGIN": False, "DATABASE": str(tmp_path / name), **config})
     if initialize:
         init_db(app.state.engine)
     return app

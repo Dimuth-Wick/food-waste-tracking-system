@@ -11,9 +11,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_session
-from app.database.queries import get_user_by_username, get_waste_record, list_lookup_items, update_waste_record
+from app.auth import actor_for
+from app.database.queries import get_waste_record, list_lookup_items, update_waste_record
 from app.waste_records.add_record import RecordForm, parse_form, render_panel
-from app.waste_records.common import DEMO_USERNAME, LOOKUPS, can_edit, local_time
+from app.waste_records.common import LOOKUPS, can_edit, local_time
 from app.waste_records.overview import day_page_url
 
 
@@ -30,10 +31,10 @@ def _record_values(record):
     }
 
 
-def _load(db: Session, record_id: int):
+def _load(request: Request, db: Session, record_id: int):
     """Return (actor, record, lookups) or raise the right HTTP error."""
     try:
-        actor = get_user_by_username(db, DEMO_USERNAME)
+        actor = actor_for(request, db)
         record = get_waste_record(db, record_id)
         if record is None:
             raise HTTPException(404)
@@ -56,7 +57,7 @@ def _load(db: Session, record_id: int):
 
 @router.get("/records/{record_id}/edit", name="edit_record")
 def edit_record_panel(request: Request, record_id: int, db: Session = Depends(get_session)):
-    actor, record, lookups = _load(db, record_id)
+    actor, record, lookups = _load(request, db, record_id)
     return render_panel(request, db, lookups=lookups, actor_name=actor.name,
                         values=_record_values(record), record_id=record_id)
 
@@ -64,7 +65,7 @@ def edit_record_panel(request: Request, record_id: int, db: Session = Depends(ge
 @router.post("/records/{record_id}/edit", name="save_edited_record")
 def save_edited_record(request: Request, record_id: int, form: RecordForm = Depends(),
                        db: Session = Depends(get_session)):
-    actor, _, lookups = _load(db, record_id)
+    actor, _, lookups = _load(request, db, record_id)
     panel = {"lookups": lookups, "actor_name": actor.name, "values": form.values,
              "record_id": record_id}
 

@@ -14,15 +14,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.auth import actor_for
 from app.database.connection import get_session
 from app.database.queries import (
     SHORTAGE_REASON,
     create_meal_check,
-    get_user_by_username,
     latest_piece_weights,
 )
 from app.forecast.views import FOOD_ITEMS, MEAL_TYPES
-from app.waste_records.common import DEMO_TIMEZONE, DEMO_USERNAME, load_lookups
+from app.waste_records.common import DEMO_TIMEZONE, load_lookups
 from app.web import api_error, url_path
 
 
@@ -128,7 +128,7 @@ def save_meal_check(request: Request, data: MealCheckIn, db: Session = Depends(g
     """Leftovers become a waste record, shortages a shortage record, and eaten amounts feed the forecast."""
     try:
         lookups = load_lookups(db, active_only=True)
-        actor = get_user_by_username(db, DEMO_USERNAME)
+        actor = actor_for(request, db)
     except SQLAlchemyError:
         logger.exception("Could not load meal check choices")
         return api_error("The database is unavailable. Initialize it and try again.", 503)

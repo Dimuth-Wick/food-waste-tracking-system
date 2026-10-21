@@ -15,8 +15,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_session
-from app.database.queries import create_waste_record, get_user_by_username
-from app.waste_records.common import DEMO_TIMEZONE, DEMO_USERNAME, load_lookups, local_time, parse_id
+from app.auth import actor_for
+from app.database.queries import create_waste_record
+from app.waste_records.common import DEMO_TIMEZONE, load_lookups, local_time, parse_id
 from app.waste_records.overview import day_page_url, render_overview, view_state
 from app.web import url_path
 
@@ -103,17 +104,17 @@ def _load(request: Request, db: Session, values):
     """
     try:
         lookups = load_lookups(db, active_only=True)
-        actor = get_user_by_username(db, DEMO_USERNAME)
+        actor = actor_for(request, db)
     except SQLAlchemyError:
         logger.exception("Could not load the waste entry form")
         return None, render_panel(request, db, lookups={}, actor_name=None, values=values,
                                   status_code=503,
                                   message="The database is unavailable. Initialize it and try again.")
-    if actor is None or not actor.active or actor.role != "entry" or not all(lookups.values()):
+    if actor is None or not actor.active or actor.role not in {"entry", "manager", "admin"} or not all(lookups.values()):
         return None, render_panel(
             request, db, lookups=lookups, actor_name=actor.name if actor else None,
             values=values, status_code=503,
-            message="Demo entry data is missing. Initialize and seed the local database first.",
+            message="User or list data is missing. Initialize and seed the local database first.",
         )
     return (lookups, actor), None
 

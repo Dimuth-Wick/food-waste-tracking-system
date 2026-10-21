@@ -56,6 +56,7 @@ templates.env.globals["url_for"] = _template_url_for
 
 
 def render(request: Request, template: str, status_code: int = 200, **context):
+    context.setdefault("current_user", getattr(request.state, "user", None))
     return templates.TemplateResponse(request, template, context, status_code=status_code)
 
 

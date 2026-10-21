@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#064e3b">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%23064e3b%27/%3E%3Crect x=%277%27 y=%2716%27 width=%275%27 height=%279%27 rx=%272%27 fill=%27%2318755a%27/%3E%3Crect x=%2713.5%27 y=%2710%27 width=%275%27 height=%2715%27 rx=%272%27 fill=%27%23ff7a1a%27/%3E%3Crect x=%2720%27 y=%2713%27 width=%275%27 height=%2712%27 rx=%272%27 fill=%27%2318755a%27/%3E%3C/svg%3E">
     <title>{% block title %}{% endblock %} · Wastewise</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     {% block head %}{% endblock %}
@@ -35,7 +36,15 @@
       <div class="content-shell">
         <header class="topbar">
           <div class="topbar-context">Hotel kitchen operations</div>
+          {% if current_user %}
+          <div class="user-menu">
+            <span class="user-avatar" aria-hidden="true">{{ current_user.name[:1]|upper }}</span>
+            <span class="user-text"><strong>{{ current_user.name }}</strong><small>{{ 'Administrator' if current_user.role == 'admin' else 'Manager' }}</small></span>
+            <form method="post" action="{{ url_for('sign_out') }}"><button class="user-signout" type="submit">Sign out</button></form>
+          </div>
+          {% else %}
           <span class="demo-pill">Local demo</span>
+          {% endif %}
         </header>
         <main id="main-content" class="page-content">
           {% block content %}{% endblock %}

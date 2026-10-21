@@ -11,14 +11,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.auth import actor_for
 from app.camera.capture import KINDS, CameraUnavailable, CaptureBusy
 from app.camera.meals import DraftError, confirm_draft, day_view
 from app.camera.store import ensure_camera_tables
 from app.database.connection import get_session
-from app.database.queries import get_user_by_username
 from app.database.tables import CameraFoodRow, CaptureRow
 from app.forecast.views import FOOD_ITEMS
-from app.waste_records.common import DEMO_USERNAME, load_lookups
+from app.waste_records.common import load_lookups
 from app.web import api_error, url_path
 
 
@@ -122,7 +122,7 @@ def confirm(request: Request, draft_id: int, body: ConfirmDraft, db: Session = D
     try:
         ensure_camera_tables(db)
         lookups = load_lookups(db, active_only=True)
-        actor = get_user_by_username(db, DEMO_USERNAME)
+        actor = actor_for(request, db)
         if actor is None or not actor.active:
             return api_error("Demo entry data is missing. Initialize and seed the local database first.", 503)
         result = confirm_draft(db, draft_id, body.model_dump(), request.app.state.settings, lookups=lookups, actor=actor)

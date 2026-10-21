@@ -109,6 +109,18 @@ def create_user(db: Session, *, name: str, username: str, password: str, role: s
     return _user(row)
 
 
+def set_user_password(db: Session, user_id: int, password: str) -> bool:
+    """Give a user a new password. Anyone signed in with the old one is signed out. False if there is no such user."""
+    if len(password) < 8:
+        raise ValueError("The password must have at least 8 characters.")
+    row = db.get(UserRow, user_id)
+    if row is None:
+        return False
+    row.password_hash = generate_password_hash(password)
+    _commit(db)
+    return True
+
+
 def get_user(db: Session, user_id: int) -> User | None:
     row = db.get(UserRow, user_id)
     return _user(row) if row else None

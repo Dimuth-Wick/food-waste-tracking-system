@@ -14,11 +14,11 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.auth import actor_for
 from app.database.connection import get_session
 from app.database.queries import (
     RecordFilters,
     count_waste_records,
-    get_user_by_username,
     get_waste_record,
     list_daily_amounts,
     list_waste_records,
@@ -27,7 +27,6 @@ from app.database.queries import (
 )
 from app.waste_records.common import (
     DEMO_TIMEZONE,
-    DEMO_USERNAME,
     FILTER_FIELDS,
     MEALS,
     HEAVY_KG,
@@ -167,7 +166,7 @@ def render_overview(request: Request, db: Session, *, panel=None, status_code=20
 
         context["summary"] = summary = build_summary(db, filters, _now_local().date())
         context["daily"] = build_daily(db, filters, _now_local().date())
-        actor = get_user_by_username(db, DEMO_USERNAME)
+        actor = actor_for(request, db)
         records = [
             {**display_row(row), "can_edit": can_edit(actor, row["user_id"]),
              "edit_url": url_path(request.app, "edit_record", record_id=row["id"], **state)}
@@ -222,7 +221,7 @@ def day_details(request: Request, day: str, db: Session = Depends(get_session)):
         errors, filters = parse_filters(values, lookups)
         if errors:
             raise HTTPException(400, " ".join(errors.values()))
-        actor = get_user_by_username(db, DEMO_USERNAME)
+        actor = actor_for(request, db)
         records = [
             {**display_row(row), "can_edit": can_edit(actor, row["user_id"]),
              "edit_url": url_path(request.app, "edit_record", record_id=row["id"], **filters_only, day=opened.isoformat())}
