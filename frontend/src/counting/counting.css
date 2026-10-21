@@ -130,7 +130,7 @@
   .fc-list li { opacity: 1; }
 }
 
-/* Meal check: two photo steps, then the save form. */
+/* Model test tool: two photo steps (start and end). */
 .mc-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
 .mc-step { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--sheet); color: var(--text); text-align: left; cursor: pointer; }
 .mc-step:hover { border-color: var(--line-strong); }
@@ -142,36 +142,6 @@
 .mc-step-text small { color: var(--muted); font-size: .85rem; }
 .mc-next { display: block; margin-top: 16px; text-align: center; text-decoration: none; }
 
-.mc-save { margin-top: 24px; }
-.mc-save h2 { margin-bottom: 0; }
-.mc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px 20px; margin-top: 18px; }
-.mc-field { display: grid; align-content: start; gap: 7px; min-width: 0; margin: 0; padding: 0; border: 0; }
-.mc-field > span:first-child, .mc-field legend, .mc-short > span { color: #1f3d33; font-size: .88rem; font-weight: 700; }
-.mc-field legend { margin-bottom: 7px; padding: 0; }
-.mc-field small { color: var(--muted); font-size: .8rem; }
-.mc-field small .link-button { padding: 0; font-size: inherit; }
-.mc-wide { grid-column: 1 / -1; }
-.mc-error { color: #a30c2a !important; font-weight: 600; }
-.mc-field [aria-invalid="true"] { border-color: #d00f35; }
-.mc-unit { position: relative; }
-.mc-unit em { position: absolute; top: 14px; right: 14px; color: var(--muted); font-style: normal; font-weight: 700; font-size: .9rem; pointer-events: none; }
-.mc-segment { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--linen); }
-.mc-segment button { padding: 8px 18px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 700; cursor: pointer; }
-.mc-segment button[aria-pressed="true"] { background: var(--sheet); color: var(--ink); box-shadow: 0 1px 4px rgba(6, 78, 59, .14); }
-.mc-check { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 600; cursor: pointer; }
-.mc-check input { width: 18px; height: 18px; accent-color: #1d6fb8; }
-.mc-short { display: grid; gap: 7px; max-width: 320px; margin-top: 10px; }
-
-.mc-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 22px 0 0; }
-.mc-summary > div { padding: 12px 16px; border-radius: 14px; background: var(--mist); }
-.mc-summary .is-waste { background: var(--accent-wash); }
-.mc-summary .is-short { background: #eef5fc; }
-.mc-summary dt { color: var(--muted); font-size: .85rem; font-weight: 700; }
-.mc-summary dd { display: grid; margin: 2px 0 0; color: var(--ink); font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.mc-summary dd small { color: var(--muted); font-size: .8rem; font-weight: 600; }
-.mc-submit { margin-top: 18px; }
-.mc-saved p { margin: 12px 0 0; }
-.mc-saved-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
 
 @media (max-width: 720px) {
   .mc-steps { grid-template-columns: 1fr; }

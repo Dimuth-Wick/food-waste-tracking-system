@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 
 import FoodCounter from "./FoodCounter.jsx";
-import SaveMealCheck from "./SaveMealCheck.jsx";
 import { plural } from "../shared/text.js";
 
 const STEPS = [
@@ -9,7 +8,8 @@ const STEPS = [
   { slot: "end", title: "End of meal", photo: "Drop the end-of-meal photo here" },
 ];
 
-// A buffet meal check: count the start photo, count the end photo, then save the difference.
+// Test tool: count a start photo and an end photo you upload, to see how well the model counts.
+// Nothing is saved; real meal checks come from the camera photos above.
 export default function MealCheck({ settings }) {
   const [item, setItem] = useState(settings.defaultItem);
   const [tab, setTab] = useState("start");
@@ -56,12 +56,11 @@ export default function MealCheck({ settings }) {
             photoTitle={step.photo}
             next={step.slot === "start"
               ? <button type="button" className="wide-button mc-next" onClick={() => setTab("end")}>Next: count the end-of-meal photo</button>
-              : <a className="wide-button mc-next" href="#mc-save">Next: save the meal check</a>}
+              : null}
           />
         </div>
       ))}
 
-      <SaveMealCheck settings={settings.mealCheck} counts={counts} onShowPhoto={setTab} />
     </div>
   );
 }

@@ -69,7 +69,7 @@ Confirming a meal check, for each food that was put out:
 - stores what was eaten and the guest count, which feed the meal forecast history;
 - shows on that day's page, for example "Cupcake: 3 of 6 left".
 
-**Test the model with your own photos** (at the bottom of the page, to be removed later): upload a start and an end photo, type what to count, and save a meal check by hand. Use it to see how well the model counts: move the **Minimum confidence** slider without re-running the model, click a pin or list row to remove a wrongly counted item, and hover a row to highlight its item.
+**Test the model with your own photos** (at the bottom of the page, to be removed later): upload a start and an end photo and type what to count. Nothing is saved; use it to see how well the model counts: move the **Minimum confidence** slider without re-running the model, click a pin or list row to remove a wrongly counted item, and hover a row to highlight its item.
 
 ### Meal forecast (`/forecast`)
 
