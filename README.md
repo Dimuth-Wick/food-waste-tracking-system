@@ -1,168 +1,166 @@
 # 🍽️ Wastewise: Hotel Food Waste Tracking & Forecasting
 
-**An intelligent food waste management and consumption forecasting web application for large-scale hotels.**
+**A web application that helps large hotels record food waste, count buffet leftovers from photos, and forecast how much food to prepare.**
 
 ## 📌 About the Project
 
-Food waste is a significant challenge in the hospitality industry. Large hotels prepare meals for hundreds of guests daily, making accurate food preparation planning essential.
+Large hotels prepare meals for hundreds of guests every day, so a small planning mistake becomes a lot of wasted food, or a buffet that runs empty. Wastewise gives kitchen staff one place to:
 
-This project aims to develop an intelligent system that helps hotels:
+- Record food waste by hand, or by counting a buffet dish in photos taken at the start and end of a meal.
+- See how much food was thrown away, where it came from and why, day by day.
+- See the days when food **ran out**, shown separately from waste.
+- Forecast how much of a dish to prepare for a meal, and check how close past forecasts were.
 
-- Monitor food preparation and consumption.
-- Track and analyze food waste.
-- Predict future food consumption using machine learning.
-- Visualize historical food consumption trends.
-- Improve kitchen planning and reduce unnecessary food waste.
+The project uses large-scale hotels such as **The Kingsbury, Sri Lanka**, as a reference scenario for real hotel operations. Dates and times in the app use Sri Lanka local time (UTC+5:30).
 
-The project uses large-scale hotels such as **The Kingsbury, Sri Lanka**, as a reference scenario for understanding real-world hotel operations.
+## 🔄 How it fits together
 
-## 🎯 Project Objectives
+```text
+  Staff add a record by hand ─────────────┐
+                                          v
+  Start photo + end photo ──> counted ──> Waste records ──> Waste overview, daily chart, day pages
+  (buffet dish, e.g. 14 → 2 buns)   │                       (totals, breakdowns, by day)
+                                    │
+                                    └──> What was eaten + guests served ──> Meal forecast history
+                                                                            (past forecasts vs actual)
 
-1. Develop a web-based food waste tracking platform.
-2. Integrate a machine learning model to forecast food consumption.
-3. Analyze historical food consumption and prediction accuracy.
-4. Reduce manual data entry through future computer vision integration.
-5. Support data-driven decisions in hotel food preparation.
+  Meal + dish + expected guests ──> forecast model ──> how much to prepare
+```
+
+- **Leftovers become waste.** If 14 buns were put out and 2 are left, 2 buns × the weight of one bun is saved as a waste record.
+- **What was eaten feeds the forecast.** The 12 buns eaten and the number of guests are stored, so the forecast page can compare what the model predicted with what really happened.
+- **Running out is not waste.** If the food ran out, the missing kilograms are recorded as a shortage. Shortages are kept out of the waste totals and shown below zero on the daily chart.
 
 ## ✨ Features
 
-### ✅ Implemented Features
+### Waste overview (`/`)
 
-**Food Waste Tracking**
+- **Filters** for a date range, area and reason. One set of filters drives the totals, the chart, the breakdowns and the table.
+- **Totals band:** total recorded, today, this week and this month (shortages are not counted as waste).
+- **Waste each day, last 30 days:** a bar chart where bars above zero are kilograms thrown away and bars below zero are days the food ran out. It has a dashed 30-day average, summary figures (thrown away, daily average, highest day, days that ran out), a day-by-day detail box on hover, keyboard support, and a "Show as a table" view.
+- **Where the waste comes from:** kilograms by area and by reason, with the largest highlighted.
+- **Waste by day:** one row per day (thrown away, ran out, which of breakfast, lunch and dinner have records, number of records), newest first. It shows the newest 5 days with a **See 20 more days** button.
+- **Add waste record / Edit** open as a side panel over the page. Each record has a date and time, a source area, a reason and a quantity in kilograms. Errors stay in the panel and keep what was typed.
 
-- Record food preparation, consumption, and waste information.
-- Organize data by food item and meal session.
+### Day pages (`/days/<date>`)
 
-**Machine Learning Prediction**
+Select a day to open its own page with:
 
-- Predict expected food consumption.
-- Use a trained regression model.
-- Integrate prediction functionality with the backend.
+- the day's totals: thrown away, ran out, number of records, and the meal with the most waste;
+- three columns for **Breakfast, Lunch and Dinner**, each with its subtotal;
+- every record with its time, whether it was **thrown away (+)** or **ran out (−)**, the area, the reason, who recorded it, and photo counts such as "Bread: 2 of 14 left";
+- an Edit link on records you may edit, and **Previous day** / **Next day** buttons.
 
-**Data Visualization**
+A record belongs to the meal saved with it (photo meal checks) or, for manual records, to the meal its time falls in: before 11:00 breakfast, before 16:00 lunch, otherwise dinner.
 
-- Display historical consumption information.
-- Compare predicted and actual food consumption.
-- Explore historical trends through interactive charts.
+### Food counting and buffet meal checks (`/food-counting`)
 
-### 🚧 Planned Features
+Count a buffet dish in two photos, then save the result:
 
-**Computer Vision Integration**
+1. **Start-of-meal photo:** drop, paste (Ctrl+V) or browse for a photo, type what to count (`bread roll`, `cupcake`, `egg`…) and press **Count**. A numbered pin appears on every item found.
+2. **End-of-meal photo:** the same, for what is left.
+3. **Save the meal check:** the counts are filled in from the photos and can be corrected. Choose the meal and the dish, enter when the meal ended, the **weight of one piece** and the **guests served**, and pick the area and the reason for the leftovers. Tick **The food ran out** and say how many more pieces were needed if there was a shortage. A live summary shows what was eaten and what will be saved as waste.
 
-- Identify remaining food items automatically from images.
-- Estimate remaining food quantities.
-- Reduce manual food waste recording.
+Saving a meal check:
 
-**Leftover Food Management**
+- adds a **waste record** for the leftovers (leftover pieces × weight per piece); nothing is added if nothing is left;
+- adds a **Ran out (shortage)** record when the food ran out;
+- stores the check, so what was eaten and the guest count feed the meal forecast history;
+- opens that day's page with the new record highlighted.
 
-- Track food reused in subsequent meal sessions.
-- Distinguish reusable leftovers from discarded waste.
+The weight per piece is remembered for each dish, so staff only set it once.
+
+In each photo you can lower or raise the **Minimum confidence** slider without re-running the model, click a pin or list row to remove a wrongly counted item (click again to bring it back), and hover a list row to highlight its item.
+
+### Meal forecast (`/forecast`)
+
+- Choose the **meal** (breakfast, lunch or dinner), the **dish** (17 dishes the model was trained on) and the **expected number of guests**. The page shows the **recommended quantity to prepare**, split into the predicted amount eaten and a 10% safety margin, plus the grams per guest, and it updates as you change the inputs.
+- **How close past forecasts were:** for the 5 most recently served dishes, the model's prediction is compared with what was actually eaten:
+  - figures for the average error in kg and in %, the days on target (within 10%) and whether the forecast leans too high or too low;
+  - a smooth chart with the actual and predicted amounts for every day, the gap shaded, **green dots for on-target days** and **red dots for off days**, and a day-details box;
+  - filters for **All meals / Breakfast / Lunch / Dinner** and for **All days / On target / Off days**;
+  - a table view, newest day first.
+
+### Across the app
+
+- A consistent design: white sheets for what people enter, dark green panels for what the system answers, a tangerine accent, and colours checked to be readable by colour-blind users. The layout works on phones.
+- Static files carry a version number, so browsers never show an outdated stylesheet after an update.
+- Friendly error pages, and API errors returned as JSON.
+- Interactive API documentation at `/docs`.
+
+## 🌐 Pages and API
+
+| Page | Address | What it is |
+|---|---|---|
+| Waste overview | `/` | Filters, totals, daily chart, breakdowns, waste by day (`/records` redirects here) |
+| Add record | `/records/new` | Opens the overview with the add panel showing |
+| Edit record | `/records/<id>/edit` | Opens the overview with the edit panel showing |
+| Day page | `/days/<date>` | One day's records by meal |
+| Meal forecast | `/forecast` | Forecast and past accuracy (React) |
+| Food counting | `/food-counting` | Count photos and save meal checks (React) |
+| API docs | `/docs` | Try the JSON APIs |
+
+| JSON API | What it does |
+|---|---|
+| `POST /api/predict-meal` | Predicted consumption and recommended quantity for a meal, dish and guest count |
+| `GET /api/forecast-history` | Past consumption compared with the model's forecast |
+| `POST /api/food-count` | Counts one kind of item in an uploaded photo (nothing is stored) |
+| `POST /api/meal-checks` | Saves a meal check: leftover and shortage records, plus what was eaten |
 
 ## 🛠️ Technologies Used
 
-| Component        | Technology                  |
-| ---------------- | --------------------------- |
-| Frontend         | HTML, CSS, JavaScript       |
-| Backend          | Python, FastAPI, Uvicorn  |
-| Database         | SQLAlchemy (SQLite by default, PostgreSQL-ready) |
-| Machine Learning | Python, Scikit-learn        |
-| Trained Model    | Pickle (.pkl)               |
-| Development      | VS Code, AI-assisted coding |
-| Version Control  | Git, GitHub                 |
+| Component | Technology |
+|---|---|
+| Backend | Python, FastAPI, Uvicorn, Jinja2 templates |
+| Database | SQLAlchemy 2, SQLite by default, PostgreSQL-ready |
+| Frontend | Server-rendered HTML and CSS, plus React 19 built with Vite for the interactive pages and the daily chart |
+| Forecast model | scikit-learn pipeline (one-hot encoding and linear regression), saved with joblib |
+| Food counting model | [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) with PyTorch and Hugging Face Transformers |
+| Tests | pytest (44 tests) |
+| Version control | Git, GitHub (`main` for stable work, `dev` for practice) |
 
-## 🏗️ System Architecture
+## 🤖 Machine learning
 
-The current application follows this general architecture:
+**Meal forecast.** The model in `ml_models/food_demand_model.pkl` is a scikit-learn pipeline that takes three inputs: **meal type**, **food item** and **guest count**, and predicts the **quantity consumed**. The app adds a 10% safety margin to give the recommended quantity. The model is trained outside the app and is not retrained automatically from saved records; the records feed the accuracy view instead.
 
-```text
-       Hotel Staff
-            |
-            v
-    Web Application
-   (HTML, CSS, JavaScript)
-            |
-            v
-     FastAPI Backend
-            |
-            v
-    Machine Learning Model
-        (Python)
-            |
-            v
-    Consumption Prediction
-            |
-            v
-       Web Dashboard
-```
+**Food counting.** OWLv2 is an open-vocabulary detector, so it finds items from a text description and needs no fine-tuning. Overlapping boxes on the same item are counted once, and a box inside a stronger box is treated as part of the same item.
 
-The frontend provides the user interface, FastAPI handles backend requests, and the machine learning model generates food consumption predictions.
-
-## 🤖 Machine Learning
-
-The forecasting component uses supervised machine learning with a regression-based approach.
-
-Potential prediction inputs include:
-
-- Food item
-- Meal type
-- Number of guests
-- Event type
-- Historical food consumption
-
-The objective is to estimate expected food demand and help kitchen staff prepare more appropriate quantities.
+- The first count downloads about 600 MB of model weights into the Hugging Face cache (`%USERPROFILE%\.cache\huggingface`). To run offline, save the model with `save_pretrained` and set `FOOD_COUNTER_MODEL_NAME` to that folder.
+- Counting works for separate items photographed from above. It does not work for loose food such as rice, curry or salad, and stacked or cut-off items can be miscounted. The staff can correct any count before saving.
+- Photos are not stored; only the counts are saved.
 
 ## 🚀 Getting Started
 
-To run the project locally:
+You need Python 3.12 or newer. Node.js is only needed if you change the React code.
 
-1. Clone this repository.
-2. Open the project folder in VS Code.
-3. Set up a Python virtual environment.
-4. Install the required project dependencies.
-5. Make sure the trained machine learning model is available.
-6. Start the app with `python run.py`.
-7. Open <http://127.0.0.1:5000/>.
+```powershell
+# 1. Create a virtual environment and install the dependencies
+py -3.12 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 
-On Windows PowerShell, create a virtual environment with `py -3.12 -m venv .venv`, install dependencies with `.venv\Scripts\python.exe -m pip install -r requirements.txt`, and run with `.venv\Scripts\python.exe run.py`. Initialize a new database with demo data with `.venv\Scripts\python.exe scripts/init_db.py --seed`.
+# 2. Create the database with demo areas, reasons and a few demo records
+.venv\Scripts\python.exe scripts/init_db.py --seed
 
-The JSON APIs used by the React pages are documented, and can be tried out, at <http://127.0.0.1:5000/docs>.
+# 3. Start the app
+.venv\Scripts\python.exe run.py
+```
 
-## Food item counting (OWLv2)
+Then open <http://127.0.0.1:5000/>. On macOS or Linux, use `python -m venv .venv` and `.venv/bin/python` instead.
 
-Open <http://127.0.0.1:5000/food-counting> (**Food counting** in the sidebar). Drop, paste (Ctrl+V) or browse for a photo, type what to count, such as `cupcake`, `egg` or `bread roll`, and press **Count**. A numbered pin drops onto each item the model finds while the total and its tally build up. You can then:
+- **The first start** needs `ml_models/food_demand_model.pkl`. Set `ML_MODEL_SKIP=1` to start without the forecast model.
+- **No login:** this prototype has no sign-in. Everything is recorded as the demo kitchen staff user, and only that user's records can be edited.
+- **Demo data:** `scripts/seed_demo_history.py` adds 30 days of demo records (a waste record for each of 5 dishes per day, some shortages, and the matching meal history) so the charts and forecast accuracy have something to show. It writes to your real database; run it with `--remove` to take the demo records out again.
 
-- drag the **Minimum confidence** slider to see the count change instantly, without re-running the model;
-- click any pin or list row to remove a wrong item from the count, and click again to restore it;
-- hover a list row to highlight its item in the photo.
+### Run the tests
 
-### Buffet meal checks
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.venv\Scripts\python.exe -m pytest -q --basetemp .pytest-run
+```
 
-The Food counting page counts a buffet dish twice: a photo at the **start of the meal** (14 buns put out) and one at the **end** (2 buns left). Below the photos, **Save the meal check** asks for the dish, the meal, when it ended, the weight of one piece, the guests served, the area and the reason for the leftovers; the counts are filled in from the photos and can be corrected. Saving (`POST /api/meal-checks`, `app/vision/meal_check.py`):
+### Change the React pages
 
-- adds a **waste record** for the leftovers (2 x weight per piece), so the Waste overview's totals, daily chart, breakdowns and table update; the row shows "Photo count · Bread: 2 of 14 left";
-- adds a **Ran out (shortage)** record when staff tick that the food ran out and say how many more pieces were needed;
-- stores the meal check in the `meal_checks` table (created automatically in older databases). What was eaten (12 x weight per piece) and the guest count feed the Meal forecast's **How close past forecasts were** section, with the most recently served dishes first.
-
-The weight per piece is remembered per dish. Photos are uploaded for now; scheduled capture from buffet cameras can be added once the camera type and snapshot address are known.
-
-The page uses the open-vocabulary detector [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) from Hugging Face Transformers (PyTorch). It finds objects from a text description, so it can count items without fine-tuning. Overlapping boxes on the same item are counted once. The first count downloads about 600 MB of model weights into the Hugging Face cache (`%USERPROFILE%\.cache\huggingface`). To run offline, save the model with `save_pretrained` and set `FOOD_COUNTER_MODEL_NAME` in the app config to that folder.
-
-Counting works for separate items photographed from above. It does not work for loose food such as rice, curry or salad, and stacked or cut-off items may be miscounted. Uploaded photos and counts are not saved.
-
-### React frontend
-
-Three pages are React apps mounted inside the server-rendered layout. Their source is in [`frontend/src/`](frontend/src/), one folder per page:
-
-| Page | Source | JSON API it calls |
-|---|---|---|
-| Meal forecast | `frontend/src/forecast/` | `POST /api/predict-meal`, `GET /api/forecast-history` |
-| Food counting | `frontend/src/counting/` | `POST /api/food-count` |
-
-The **Waste overview** is a Jinja template rendered by FastAPI. It combines the filters, totals, breakdowns and the full record table on one page; **Add waste record** and **Edit** open as a side panel over it. Old `/records` links redirect to the overview, and `/records/new` opens the overview with the add panel showing, so kitchen staff can bookmark it. All pages share the colours and layout in `app/static/styles.css`: white sheets hold what people enter, and dark green panels hold what the system answers.
-
-**Daily waste chart.** The overview charts the last 30 days (`frontend/src/daily/`). Bars above zero are kilograms thrown away; bars below zero are days the food ran out. To record a shortage, add a record with the reason **Ran out (shortage)** and enter the kilograms that were missing. Shortages are kept out of the waste totals and breakdowns, and shown as negative amounts (blue) in the table. Waste and shortage are never netted into one number, because they would cancel each other out.
-
-The built files are committed in `app/static/react/`, so `python run.py` works without Node.js. To change the React code, install [Node.js](https://nodejs.org/), then:
+The built files are committed in `app/static/react/`, so `python run.py` works without Node.js. To change the React code:
 
 ```powershell
 cd frontend
@@ -172,17 +170,27 @@ npm run watch   # rebuilds app/static/react on every save; refresh the browser
 
 Run `npm run build` once before committing so the committed files match the source.
 
-To see the forecast history chart with sample data, run `python scripts/seed_demo_history.py`. It adds demo records, marked as demo data, to your real database (`instance/food_waste.sqlite3`); run it with `--remove` to take them out again.
-
-Run tests with `.venv\Scripts\python.exe -m pip install -r requirements-dev.txt` and `.venv\Scripts\python.exe -m pytest -q --basetemp .pytest-run`.
-
 ## 🗄️ Database
 
-The app uses SQLAlchemy, so it runs on the local SQLite file by default and on PostgreSQL by changing one setting. The **Waste by day** table has one row per day (thrown away, ran out, meals recorded), newest first, with a "See more" button. Selecting a day opens its own page at `/days/<date>` (`app/templates/day.html`) with the day's totals and every record grouped into Breakfast, Lunch and Dinner: time, thrown away (+) or ran out (−), area, reason, photo counts and who recorded it, with Previous day and Next day buttons, and the overview's totals are added up by the database.
+SQLAlchemy lets the app run on the local SQLite file by default, and on PostgreSQL by changing one setting.
 
-| Setting | Default | Example |
+| Table | Holds |
+|---|---|
+| `waste_records` | Every waste or shortage record: time (stored as UTC), area, reason, kilograms, who recorded it, notes |
+| `meal_checks` | Buffet meal checks from photos: start and end pieces, weight per piece, guests, and the records they created |
+| `areas`, `reasons` | The lists used in the forms and filters |
+| `categories` | One hidden placeholder ("Whole waste"); records no longer have a food category, but older databases still require the column |
+| `users` | Demo users with hashed passwords |
+
+`meal_checks` is created automatically the first time it is needed, so older databases keep working. Existing SQLite files from the earlier Flask version work without changes.
+
+### Settings
+
+| Setting | Default | Meaning |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///instance/food_waste.sqlite3` | `postgresql+psycopg://user:password@localhost/food_waste` |
+| `DATABASE_URL` | `sqlite:///instance/food_waste.sqlite3` | SQLAlchemy database URL |
+| `ML_MODEL_SKIP` | not set | Set to `1` to start without loading the forecast model |
+| `FOOD_COUNTER_MODEL_NAME` | `google/owlv2-base-patch16-ensemble` | Folder or Hugging Face name of the counting model |
 
 To use PostgreSQL:
 
@@ -193,11 +201,9 @@ $env:DATABASE_URL = "postgresql+psycopg://user:password@localhost/food_waste"
 .venv\Scripts\python.exe run.py
 ```
 
-`scripts/init_db.py` only creates missing tables, so it is safe to run on an existing database. Existing SQLite files from the earlier Flask version work without changes.
+`scripts/init_db.py` only creates missing tables, so it is safe to run on an existing database. The PostgreSQL path has not yet been tested against a live server.
 
 ## 🧭 Project map
-
-Each backend feature has its own folder in `app/`, named after the page it serves. The React pages in `frontend/src/` use the same names.
 
 ```text
 food-waste-tracking-system/
@@ -207,14 +213,14 @@ food-waste-tracking-system/
 │   ├── config.py           Settings, such as DATABASE_URL
 │   ├── web.py              Shared page helpers: templates, URLs, error pages, upload size limit
 │   ├── database/           Tables (SQLAlchemy), connection, queries and demo seed data
-│   ├── waste_records/      Waste overview page, and the Add and Edit record side panels
+│   ├── waste_records/      Waste overview, day pages, and the Add and Edit record panels
 │   ├── forecast/           Meal forecast page, its JSON APIs and the forecast model loader
-│   ├── vision/             Food counting page, shared upload checks
+│   ├── vision/             Food counting page, photo counting and meal-check saving, upload checks
 │   ├── templates/          HTML for the server-rendered pages and the shared layout
 │   └── static/             styles.css for every page; react/ holds the built React pages
-├── frontend/               React source for three pages (Node.js only needed to change them)
-│   └── src/                forecast/, counting/ and shared/
-├── ml_models/              Trained model files: forecast (.pkl); the unused Food-101 classifier (.keras) is kept
+├── frontend/               React source (Node.js only needed to change it)
+│   └── src/                forecast/, counting/, daily/ and shared/
+├── ml_models/              food_demand_model.pkl (forecast); an unused Food-101 classifier is kept
 ├── scripts/                init_db.py (create tables, demo data) and seed_demo_history.py
 └── tests/                  pytest tests, one file per feature
 ```
@@ -222,29 +228,40 @@ food-waste-tracking-system/
 Where to start:
 
 - **Change a page's URL or add a page:** the `@router.get` / `@router.post` line above the view in its feature folder. A new feature's `router` is added to `ROUTERS` in `app/__init__.py`.
-- **Change the waste overview or the record form:** `app/waste_records/` (`overview.py`, `add_record.py`, `edit_record.py`) and `app/templates/` (`overview.html`, `_record_panel.html`).
-- **Change the forecast or counting page:** the Python view in `app/forecast/` or `app/vision/`, and the matching React folder in `frontend/src/`. Then run `npm run build` in `frontend/`.
+- **Change the overview, a day page or the record form:** `app/waste_records/` (`overview.py`, `add_record.py`, `edit_record.py`) and `app/templates/` (`overview.html`, `day.html`, `_record_panel.html`).
+- **Change the forecast, counting or daily chart:** the Python view in `app/forecast/`, `app/vision/` or `app/waste_records/`, and the matching React folder in `frontend/src/`. Then run `npm run build` in `frontend/`.
 - **Change colours or layout used everywhere:** `app/static/styles.css`.
+
+## ⚠️ Limitations
+
+- It is a local prototype: no login or roles, and one demo user records everything.
+- Forecasts cover the 17 dishes and 3 meals the model was trained on.
+- Counting needs a photo of separate items from above, and the weight per piece is entered by staff rather than measured from the photo.
+- Photos are uploaded by hand. Automatic capture from buffet cameras is not built yet.
+- The forecast model does not learn from the saved records automatically.
 
 ## 🗺️ Development Roadmap
 
 - [x] Identify the food waste management problem.
-- [x] Design the initial web application.
-- [x] Train a machine learning forecasting model.
-- [x] Connect the machine learning model to the backend.
-- [ ] Implement historical consumption charts.
-- [ ] Add interactive chart functionality.
-- [ ] Integrate automatic food recognition.
-- [ ] Estimate remaining food quantities from images.
-- [ ] Implement food reuse tracking.
-- [ ] Test using realistic hotel operational scenarios.
-- [ ] Improve the application's performance and reliability.
+- [x] Train a machine learning forecasting model and connect it to the backend.
+- [x] Waste records with filters, totals, breakdowns and a 30-day chart.
+- [x] Day-by-day pages with records grouped by meal.
+- [x] Track shortages (food that ran out) separately from waste.
+- [x] Count buffet leftovers from start and end photos.
+- [x] Feed what was eaten back into the forecast accuracy charts.
+- [x] Interactive forecast accuracy charts with on-target and off-day marking.
+- [ ] Capture photos automatically from buffet cameras at set times.
+- [ ] Estimate food weight directly from photos.
+- [ ] Add login and roles for kitchen staff, supervisors and administrators.
+- [ ] Track leftover food reused in later meals.
+- [ ] Retrain the forecast model from saved records.
+- [ ] Test with PostgreSQL and realistic hotel scenarios.
 
 ## 📚 Project Purpose
 
 This project is developed as an educational and practical software engineering project to explore the application of machine learning, web development, and computer vision to a real-world industrial problem.
 
-**Current Status:** Prototype under active development.
+**Current Status:** Working prototype under active development.
 
 ---
 
