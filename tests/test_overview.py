@@ -66,9 +66,8 @@ def test_overview_uses_stored_rows_and_local_calendar_boundaries(overview_app):
     # Vegetables 15 kg at Rs 350 and Bakery 13 kg at Rs 900: the money leads, and food is a breakdown too.
     assert "16,950" in html and "Rs 11,700" in html and "Rs 5,250" in html
     assert 'aria-label="Bakery: 13.00 kilograms, about Rs 11,700"' in html
-    assert "Kitchen: 16.00 kilograms" in html
-    assert "Buffet: 12.00 kilograms" in html
-    assert "Spoilage: 15.00 kilograms" in html
+    assert "By area" not in html and "By reason" not in html      # the cameras watch the buffet: only food is broken down
+    assert "Kitchen: 16.00 kilograms" not in html and "Spoilage: 15.00 kilograms" not in html
     # One row per day, newest first; only the newest five days are listed to begin with.
     assert "03 Oct 2026" in html and "28 Sep 2026" in html and "27 Sep 2026" not in html
     assert "See 1 more day" in html and "Waste by day" in html

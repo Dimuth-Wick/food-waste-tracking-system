@@ -80,9 +80,7 @@ def build_summary(db: Session, filters: RecordFilters, today: date) -> dict:
         "today_value": total_waste_value(db, _within(filters, today, today)),
         "week_value": total_waste_value(db, _within(filters, today - timedelta(days=today.weekday()), today)),
         "month_value": total_waste_value(db, _within(filters, today.replace(day=1), today)),
-        "area_breakdown": _breakdown(waste_by(db, "areas", filters)),
         "food_breakdown": _breakdown(waste_by(db, "categories", filters)),
-        "reason_breakdown": _breakdown(waste_by(db, "reasons", filters)),
         "record_count": count_waste_records(db, filters),
     }
 

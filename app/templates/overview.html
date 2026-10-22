@@ -63,7 +63,7 @@
     <span class="sheet-note">Most costly highlighted</span>
   </div>
   <div class="breakdown-columns">
-    {% for title, items in [('area', summary.area_breakdown), ('food', summary.food_breakdown), ('reason', summary.reason_breakdown)] %}
+    {% for title, items in [('food', summary.food_breakdown)] %}
     <section class="breakdown" aria-labelledby="{{ title }}-title">
       <h3 id="{{ title }}-title">By {{ title }}</h3>
       <div class="bar-list">

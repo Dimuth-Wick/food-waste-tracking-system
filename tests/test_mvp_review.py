@@ -39,7 +39,7 @@ def test_complete_record_flow_persists_after_reopening_app(tmp_path, monkeypatch
     day = browser.get("/days/2026-10-02").text
     assert "FW-001" in day and "2.5 kg" in day and "/records/1/edit" in day
     assert "2.50" in overview
-    assert "Buffet: 2.50 kilograms" in overview
+    assert ": 2.50 kilograms" in overview
 
     edit_form = browser.get("/records/1/edit")
     assert edit_form.status_code == 200

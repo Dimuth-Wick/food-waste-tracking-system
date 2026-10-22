@@ -39,7 +39,7 @@ The project uses large-scale hotels such as **The Kingsbury, Sri Lanka**, as a r
 - **Filters** for a date range, area, food and reason. One set of filters drives the totals, the chart, the breakdowns and the table.
 - **Totals band:** the waste **value** (≈ Rs) for the total, today, this week and this month, with the kilograms underneath (shortages are not counted as waste).
 - **Waste each day, last 30 days:** a bar chart, switchable between **cost (Rs)** and **weight (kg)**, where bars above zero are waste and bars below zero are days the food ran out. It has a dashed 30-day average, summary figures (thrown away, daily average, highest day, days that ran out), a day-by-day detail box on hover, keyboard support, and a "Show as a table" view.
-- **Where the waste cost comes from:** value by area, by **food** and by reason, with the most costly highlighted. See [Waste value](#-waste-value).
+- **Where the waste cost comes from:** value by **food**, with the most costly highlighted (the cameras watch the buffet, so waste is not split by kitchen area or reason here). See [Waste value](#-waste-value).
 - **Waste by day:** one row per day (thrown away, ran out, which of breakfast, lunch and dinner have records, number of records), newest first. It shows the newest 5 days with a **See 20 more days** button.
 - **Add waste record / Edit** open as a side panel over the page. Each record has a date and time, a source area, the **food**, a reason and a quantity in kilograms, and shows its approximate cost as you type. Errors stay in the panel and keep what was typed.
 
@@ -239,7 +239,7 @@ Hotels care about what waste **costs**, not what it weighs. Every waste record s
 - **Shortages** (food that ran out) are not counted in the waste value. They are shown separately, below zero in the chart, with the value of the food that was short.
 
 **Where it shows**
-- **Waste overview:** the totals band (total, today, this week, this month) leads with value and keeps the kilograms underneath. **Where the waste cost comes from** breaks the cost down **by area, by food and by reason**, most costly first, so a light but expensive food (fish curry) ranks above a heavy cheap one (salad). A **Food** filter narrows everything to one food.
+- **Waste overview:** the totals band (total, today, this week, this month) leads with value and keeps the kilograms underneath. **Where the waste cost comes from** breaks the cost down **by food**, most costly first, so a light but expensive food (fish curry) ranks above a heavy cheap one (salad). A **Food** filter narrows everything to one food.
 - **Waste each day:** the 30-day chart switches between **Cost (Rs)** (the default) and **Weight (kg)**.
 - **Waste by day and day pages:** each day's value, each meal's subtotal, and every record's food and "≈ Rs 1,500 lost".
 - **Add / Edit waste record:** choose the **Food**; as you type the weight the form shows the cost, for example "≈ Rs 2,800 (3.5 kg at Rs 800 per kg)".

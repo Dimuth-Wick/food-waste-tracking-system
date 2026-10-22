@@ -109,7 +109,7 @@ h2 { margin-bottom: 0; color: var(--ink); font-size: 1.12rem; line-height: 1.3; 
 
 /* ---- Breakdowns -------------------------------------------------------- */
 
-.breakdown-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+.breakdown-columns { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
 .breakdown { min-width: 0; padding: 0 26px; }
 .breakdown:first-child { padding-left: 0; }
 .breakdown:last-child { padding-right: 0; }
