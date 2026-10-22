@@ -13,7 +13,7 @@ from sqlalchemy import func, inspect, select
 from sqlalchemy.orm import Session
 from werkzeug.security import generate_password_hash
 
-from app.database.prices import FALLBACK_PRICE, LEGACY_PLACEHOLDER, MIXED_FOOD
+from app.database.prices import FALLBACK_PRICE, LEGACY_PLACEHOLDER, MIXED_FOOD, create_price_table
 from app.database.tables import (
     LOOKUP_TABLES,
     AreaRow,
@@ -236,7 +236,7 @@ def _ensure_price_table(db: Session) -> None:
     """The price table exists (empty if nothing has set prices yet), so value queries never fail."""
     key = id(db.get_bind())
     if key not in _PRICE_TABLES:
-        FoodPriceRow.__table__.create(db.get_bind(), checkfirst=True)
+        create_price_table(db.get_bind())
         _PRICE_TABLES.add(key)
 
 

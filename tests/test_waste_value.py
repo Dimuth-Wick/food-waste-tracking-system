@@ -254,7 +254,7 @@ def test_saving_prices_updates_every_value(tmp_path):
         before = total_waste_value(db)
     with database(app) as db:       # the real form sends every price, as shown
         body = {f"price_{row[0]}": f"{row[1]:g}" for row in sql(db, "SELECT category_id, price_per_kg FROM food_prices").all()}
-    body.update({f"price_{fried}": "1,200", f"price_{steamed}": "", "new_name": "  Boiled   egg ", "new_price": "700"})
+    body.update({f"price_{fried}": "1,200", f"price_{steamed}": "", "new_name": "  Boiled   egg ", "price_new": "700"})
     response = browser.post("/food-prices", data=body)
     assert response.status_code == 303 and response.headers["location"] == "/food-prices?saved=1"
     assert "Prices saved." in browser.get(response.headers["location"]).text
@@ -267,12 +267,59 @@ def test_saving_prices_updates_every_value(tmp_path):
     assert "Using Rs 600" in browser.get("/food-prices").text                  # the unpriced food says what it uses
 
 
+def test_a_food_can_be_priced_per_piece(tmp_path):
+    app = app_with_prices(tmp_path)
+    browser = client(app)
+    with database(app) as db:
+        fried = food_id(db, "Fried rice")
+    body = {f"price_{fried}": "600", f"unit_{fried}": "kg", f"price_{food_id_of(app, MIXED_FOOD)}": "600",
+            "new_name": "Sausage bun", "price_new": "90", "unit_new": "piece", "grams_new": "60"}
+    assert browser.post("/food-prices", data=body).status_code == 303
+    with database(app) as db:
+        row = sql(db, "SELECT p.price_per_kg, p.price_per_piece, p.piece_kg FROM food_prices p JOIN categories c ON c.id = p.category_id "
+                      "WHERE c.name = 'Sausage bun'").one()
+        assert row[1] == 90 and row[2] == pytest.approx(0.06) and row[0] == pytest.approx(1500)   # Rs 90 for 60 g is Rs 1,500 a kg
+    page = browser.get("/food-prices").text
+    assert 'value="90"' in page and 'value="60"' in page and "About Rs 1,500 per kg" in page
+    body = {f"price_{fried}": "600", f"price_{food_id_of(app, MIXED_FOOD)}": "600", "price_new": "", "new_name": ""}
+    body[f"price_{food_id_of(app, 'Sausage bun')}"] = "100"
+    body[f"unit_{food_id_of(app, 'Sausage bun')}"] = "piece"
+    body[f"grams_{food_id_of(app, 'Sausage bun')}"] = "50"
+    assert browser.post("/food-prices", data=body).status_code == 303
+    with database(app) as db:
+        assert scalar(db, "SELECT price_per_kg FROM food_prices WHERE price_per_piece = 100") == pytest.approx(2000)
+
+
+def food_id_of(app, name):
+    with database(app) as db:
+        return food_id(db, name)
+
+
+def test_a_price_per_piece_needs_the_weight_of_a_piece(tmp_path):
+    app = app_with_prices(tmp_path)
+    response = client(app).post("/food-prices", data={"new_name": "Sausage bun", "price_new": "90", "unit_new": "piece", "grams_new": ""})
+    assert response.status_code == 400 and "what one piece weighs" in response.text
+    with database(app) as db:
+        assert scalar(db, "SELECT COUNT(*) FROM categories WHERE name = 'Sausage bun'") == 0
+
+
+def test_older_price_tables_gain_the_per_piece_columns(tmp_path):
+    app = app_with_prices(tmp_path)
+    with database(app) as db:
+        sql(db, "ALTER TABLE food_prices DROP COLUMN price_per_piece")
+        sql(db, "ALTER TABLE food_prices DROP COLUMN piece_kg")
+        db.commit()
+    assert client(app).get("/food-prices").status_code == 200
+    with database(app) as db:
+        assert scalar(db, "SELECT COUNT(piece_kg) FROM food_prices") == 0
+
+
 def test_bad_prices_are_explained_and_nothing_is_saved(tmp_path):
     app = app_with_prices(tmp_path)
     browser = client(app)
     with database(app) as db:
         fried, mixed = food_id(db, "Fried rice"), food_id(db, MIXED_FOOD)
-    response = browser.post("/food-prices", data={f"price_{fried}": "free", f"price_{mixed}": "", "new_name": "Fried rice", "new_price": "-5"})
+    response = browser.post("/food-prices", data={f"price_{fried}": "free", f"price_{mixed}": "", "new_name": "Fried rice", "price_new": "-5"})
     assert response.status_code == 400
     page = response.text
     assert "Enter a price above 0" in page and "Mixed food needs a price" in page

@@ -221,5 +221,7 @@ class FoodPriceRow(Base):
     __table_args__ = (CheckConstraint("price_per_kg > 0", name="food_price_positive"),)
 
     category_id: Mapped[int] = mapped_column(Id, ForeignKey("categories.id"), primary_key=True)
-    price_per_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    price_per_kg: Mapped[float] = mapped_column(Float, nullable=False)   # always set: for a per-piece food it is derived
+    price_per_piece: Mapped[float | None] = mapped_column(Float, nullable=True)   # set when the food is priced per piece
+    piece_kg: Mapped[float | None] = mapped_column(Float, nullable=True)          # what one piece weighs
     updated_at: Mapped[str] = mapped_column(String(32), nullable=False)

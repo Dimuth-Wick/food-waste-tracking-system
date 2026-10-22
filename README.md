@@ -123,7 +123,7 @@ Confirming a meal check, for each food that was put out:
 | Forecast model | scikit-learn pipeline (one-hot encoding and linear regression), saved with joblib |
 | Food counting model | [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) with PyTorch and Hugging Face Transformers |
 | Camera capture | OpenCV (reads the camera stream), APScheduler (meal times) |
-| Tests | pytest (142 tests) |
+| Tests | pytest (145 tests) |
 | Version control | Git, GitHub (`main` for stable work, `dev` for practice) |
 
 ## 🤖 Machine learning
@@ -221,6 +221,7 @@ Or press **Start photos** / **End photos** on the Food counting page, or call `P
 Hotels care about what waste **costs**, not what it weighs. Every waste record says **which food** it is (rice, chicken curry, bread roll…), each food has an **approximate price per kilogram**, and Wastewise shows waste as money first with the weight underneath: **≈ Rs 220,880** (383 kg).
 
 - **Value = kilograms × the price of that food.** The prices are rough estimates in Sri Lankan rupees (`CURRENCY_CODE=LKR`, shown as `Rs`) of the ingredient cost of a kilogram of prepared food, for example Steamed rice Rs 250, Chicken curry Rs 1,000, Fish curry Rs 1,300. **They are starting guesses, not quotes: review them on the Food prices page and set your own.**
+- **Per kilogram or per piece.** Price a food per kilogram (rice, curry) or per piece (a bun, a sausage bun, an egg) and enter what one piece weighs in grams. Waste is recorded in kilograms, so a piece price is turned into a price per kilogram (Rs 90 for a 60 g bun is Rs 1,500 per kg).
 - **Foods without their own price** use the price of **Mixed food** (also editable), so every record has a value. Leave a price empty to use it.
 - **Values use today's prices.** Change a price and the value of every record of that food, past and future, changes with it. Nothing is stored per record, so prices can be corrected at any time.
 - **Shortages** (food that ran out) are not counted in the waste value. They are shown separately, below zero in the chart, with the value of the food that was short.

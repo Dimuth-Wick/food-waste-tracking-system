@@ -327,6 +327,9 @@ tr.is-new td { background: var(--accent-wash); }
 .price-input { display: inline-flex; align-items: center; gap: 6px; }
 .price-input .cur { color: var(--muted); font-size: .85rem; font-weight: 700; }
 .price-input input, .price-new th input { min-height: 40px; padding: 6px 10px; border: 1px solid var(--line-strong); border-radius: 9px; font: inherit; }
+.unit-select { min-height: 40px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 9px; font: inherit; background: #fff; }
+.grams-input input { width: 84px; }
+.grams-input input:disabled { opacity: .4; }
 .price-input input { width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
 .price-input input:focus, .price-new th input:focus { border-color: var(--leaf); outline: 3px solid rgba(10, 138, 84, .16); }
 .price-input input[aria-invalid="true"], .price-new th input[aria-invalid="true"] { border-color: #d00f35; }

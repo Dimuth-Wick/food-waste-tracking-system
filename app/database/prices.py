@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import json
 import logging
 
-from sqlalchemy import func, inspect, select
+from sqlalchemy import func, inspect, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -34,6 +34,16 @@ DEFAULT_PRICES = {
     "Vegetables": 350, "Prepared Food": 700, "Bakery": 900, "Meat & Seafood": 1200,
     MIXED_FOOD: 600,
 }
+
+
+def create_price_table(bind) -> None:
+    """Create the price table, or add the per-piece columns to one made before they existed."""
+    FoodPriceRow.__table__.create(bind, checkfirst=True)
+    have = {column["name"] for column in inspect(bind).get_columns(FoodPriceRow.__tablename__)}
+    with bind.begin() as conn:
+        for name in ("price_per_piece", "piece_kg"):
+            if name not in have:
+                conn.execute(text(f"ALTER TABLE {FoodPriceRow.__tablename__} ADD COLUMN {name} FLOAT"))
 
 
 def _now() -> str:
@@ -65,7 +75,7 @@ def ensure_price_data(db: Session) -> bool:
     try:
         if not inspect(bind).has_table(CategoryRow.__tablename__) or not inspect(bind).has_table(WasteRecordRow.__tablename__):
             return False
-        FoodPriceRow.__table__.create(bind, checkfirst=True)
+        create_price_table(bind)
 
         # the placeholder food is now called Mixed food
         names = _by_name(db)
