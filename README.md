@@ -97,6 +97,7 @@ Confirming a meal check, for each food that was put out:
 | Edit record | `/records/<id>/edit` | Opens the overview with the edit panel showing |
 | Day page | `/days/<date>` | One day's records by meal, with food and value |
 | Food prices | `/food-prices` | The approximate price per kg or per piece of each food (sign-in needed) |
+| Camera status | `/cameras` | Whether each buffet camera is online, and a Check now button (sign-in needed) |
 | Weekly report | `/reports` | Who gets the weekly email, a preview, and test and send-now buttons (sign-in needed) |
 | Meal forecast | `/forecast` | Forecast and past accuracy (React) |
 | Sign in | `/login` | Manager sign-in (public); `POST /logout` signs out |
@@ -124,7 +125,7 @@ Confirming a meal check, for each food that was put out:
 | Forecast model | scikit-learn pipeline (one-hot encoding and linear regression), saved with joblib |
 | Food counting model | [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) with PyTorch and Hugging Face Transformers |
 | Camera capture | OpenCV (reads the camera stream), APScheduler (meal times) |
-| Tests | pytest (159 tests) |
+| Tests | pytest (174 tests) |
 | Version control | Git, GitHub (`main` for stable work, `dev` for practice) |
 
 ## 🤖 Machine learning
@@ -217,6 +218,18 @@ Or press **Start photos** / **End photos** on the Food counting page, or call `P
 
 **6. Counting.** Photos are counted one at a time in the background, so the pages and the schedule never wait. The model loads once, on the first photo, which takes about a minute; after that each photo takes some seconds. A station with no foods on its list shows "No foods set up" and nothing is counted.
 
+## 🚨 Camera offline alerts
+
+A buffet camera that is switched off, out of battery or off the Wi-Fi means missing meal photos and missing meal checks, so Wastewise watches the cameras and tells you.
+
+- **Checks:** every camera is checked every **5 minutes** between meals, and every meal photo also counts as a check. A camera that fails **3 checks in a row** is **offline**. A capture where a camera gave no photo at all (after its retries) marks it offline straight away.
+- **On screen:** while a camera is offline, an orange warning shows at the top of **every page** with a link, and **Camera status** in the sidebar gets a `!`.
+- **By email:** the managers on the **Weekly report** list get **one email** saying which camera is offline, since when, what went wrong (never the camera's address or password) and what to check. If the email cannot be sent yet (email not set up, nobody on the list, mail server down), it is retried at the next check. When the camera comes back, a second email says so.
+- **Camera status page** (`/cameras`): each camera's state, when it went offline, the problem, the last picture and the last check, and a **Check now** button.
+- **Restarts:** an outage is remembered (`camera_status` table), so restarting the app does not hide it or send the email twice.
+- **Settings:** `CAMERA_CHECK_MINUTES` (default 5), `CAMERA_OFFLINE_AFTER` (default 3) and `CAMERA_ALERTS=0` to turn the emails off (the warning on screen stays). The emails use the same `ADMIN_EMAIL` and `SMTP_*` settings as the weekly report.
+- **Limits:** the checks run inside the app, so they only happen while it is running. A check waits while a meal capture is running, because the camera is in use.
+
 ## 💰 Waste value
 
 Hotels care about what waste **costs**, not what it weighs. Every waste record says **which food** it is (rice, chicken curry, bread roll…), each food has an **approximate price per kilogram**, and Wastewise shows waste as money first with the weight underneath: **≈ Rs 220,880** (383 kg).
@@ -307,6 +320,7 @@ SQLAlchemy lets the app run on the local SQLite file by default, and on PostgreS
 | `areas`, `reasons` | The lists used in the forms and filters |
 | `categories` | The foods: menu dishes, camera foods, food groups and **Mixed food**. Each record is of one food |
 | `food_prices` | The approximate price per kilogram (or per piece) of each food |
+| `camera_status` | Whether each camera is online or offline, and when the alert email went out |
 | `report_recipients`, `report_settings`, `report_log` | Who gets the weekly report, whether it is on, and each send |
 | `users` | Demo users with hashed passwords |
 
@@ -356,7 +370,7 @@ food-waste-tracking-system/
 │   ├── forecast/           Meal forecast page, its JSON APIs and the forecast model loader
 │   ├── reports/            Weekly email report: builder, SMTP mailer, schedule and the Weekly report page
 │   ├── vision/             Food counting page, photo counting and meal-check saving, upload checks
-│   ├── camera/             Camera capture: taking photos, schedule, background counting, pairing, APIs
+│   ├── camera/             Camera capture: taking photos, schedule, background counting, pairing, APIs, health checks and the Camera status page
 │   ├── templates/          HTML for the server-rendered pages and the shared layout
 │   └── static/             styles.css for every page; react/ holds the built React pages
 ├── frontend/               React source (Node.js only needed to change it)
@@ -398,6 +412,7 @@ Where to start:
 - [ ] Fine-tune the counting model with the saved camera photos.
 - [x] Waste shown as approximate money, with a price per kg for each food.
 - [x] A weekly email report to managers, with charts, shortages and advice.
+- [x] Camera offline alerts: a warning on every page and an email to managers.
 - [ ] Show the cost of the recommended quantity on the meal forecast, and keep a history of price changes.
 - [ ] Estimate food weight directly from photos.
 - [x] Manager sign-in with sessions, password protection and an animated sign-in page.

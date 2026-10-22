@@ -258,3 +258,18 @@ class ReportLogRow(Base):
     sent_to: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     error: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     created_at: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class CameraStatusRow(Base):
+    """Whether a buffet camera is reachable, kept so a restart does not forget an outage."""
+
+    __tablename__ = "camera_status"
+
+    name: Mapped[str] = mapped_column(String(40), primary_key=True)
+    status: Mapped[str] = mapped_column(String(10), nullable=False)            # online or offline
+    failures: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    last_ok_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    checked_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    offline_since: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    last_error: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    alerted_at: Mapped[str | None] = mapped_column(String(32), nullable=True)  # when the offline email went out

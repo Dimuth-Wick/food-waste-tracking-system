@@ -353,3 +353,21 @@ tr.is-new td { background: var(--accent-wash); }
 .recipient-row input[aria-invalid="true"] { border-color: #d00f35; }
 .report-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
 .report-failed { color: #a13e35; }
+
+/* Camera status and offline warning */
+.camera-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-bottom: 18px; padding: 12px 18px; border-radius: 12px; background: #fff0e4; border: 1px solid #f3b27a; color: #7a3a07; }
+.camera-banner a { margin-left: auto; color: #7a3a07; font-weight: 700; }
+.nav-alert { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 6px; border-radius: 50%; background: #ff7a1a; color: #fff; font-size: .72rem; font-weight: 800; }
+.camera-list { margin: 0 0 16px; padding: 0; list-style: none; display: grid; gap: 12px; }
+.camera-item { padding: 16px 18px; border: 1px solid var(--line-strong); border-left-width: 5px; border-radius: 12px; background: #fff; }
+.camera-item.is-online { border-left-color: #0a8a54; }
+.camera-item.is-offline { border-left-color: #ff7a1a; background: #fffaf5; }
+.camera-item.is-unknown { border-left-color: #a6b9ae; }
+.camera-main { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 1.05rem; }
+.camera-pill { padding: 3px 12px; border-radius: 999px; font-size: .8rem; font-weight: 700; background: #e6efe9; color: #245b46; }
+.camera-pill.is-offline { background: #ffe1c7; color: #8a3d05; }
+.camera-pill.is-unknown { background: #eceff0; color: #566; }
+.camera-facts { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 0 0 6px; }
+.camera-facts div { min-width: 140px; }
+.camera-facts dt { color: var(--muted); font-size: .78rem; font-weight: 600; }
+.camera-facts dd { margin: 0; font-weight: 600; }

@@ -27,6 +27,7 @@
           <ul aria-labelledby="nav-models">
             <li><a href="{{ url_for('forecast') }}" {% if active_page == 'forecast' %}aria-current="page"{% endif %}>Meal forecast</a></li>
             <li><a href="{{ url_for('food_counting') }}" {% if active_page == 'food_counting' %}aria-current="page"{% endif %}>Food counting</a></li>
+            <li><a href="{{ url_for('camera_status') }}" {% if active_page == 'cameras' %}aria-current="page"{% endif %}>Camera status{% if camera_alerts %} <span class="nav-alert" aria-label="offline">!</span>{% endif %}</a></li>
           </ul>
         </nav>
         <div class="sidebar-note">
@@ -49,6 +50,13 @@
           {% endif %}
         </header>
         <main id="main-content" class="page-content">
+          {% if camera_alerts and active_page != 'cameras' %}
+          <div class="camera-banner" role="alert">
+            <strong>{{ camera_alerts|map(attribute='name')|join(', ') }} {{ 'camera is' if camera_alerts|length == 1 else 'cameras are' }} offline.</strong>
+            <span>Meal photos are not being taken.</span>
+            <a href="{{ url_for('camera_status') }}">See camera status</a>
+          </div>
+          {% endif %}
           {% block content %}{% endblock %}
         </main>
       </div>

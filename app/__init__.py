@@ -5,6 +5,7 @@ create_app() includes them all. The JSON APIs are documented at /docs.
 """
 
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -13,8 +14,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import auth
+from app.camera import status_page as camera_status
 from app.camera import views as camera
 from app.camera.capture import CaptureService
+from app.camera.health import CameraMonitor
 from app.camera.schedule import start_scheduler, stop_scheduler
 from app.camera.worker import CountingWorker, store_and_queue
 from app.config import load_settings
@@ -34,7 +37,7 @@ ROUTERS = (
     forecast.router,                                                              # meal forecast
     reports.router,                                                               # weekly email report
     counting.router, meal_check.router,                                           # food counting
-    camera.router,                                                                # camera captures
+    camera.router, camera_status.router,                                          # camera captures and status
 )
 
 
@@ -66,7 +69,16 @@ def create_app(config=None) -> FastAPI:
     templates.env.globals["CURRENCY_SYMBOL"] = settings["CURRENCY_SYMBOL"]
     app.state.capture_service = CaptureService(settings)
     app.state.counting_worker = CountingWorker(app)
-    app.state.capture_service.on_event = lambda event: store_and_queue(app, event)
+    app.state.camera_monitor = CameraMonitor(app)
+
+    def on_capture(event):
+        try:
+            app.state.camera_monitor.record_event(event)   # a camera that gave no photo is reported offline
+        except Exception:
+            logging.getLogger(__name__).exception("Could not record the camera status.")
+        return store_and_queue(app, event)
+
+    app.state.capture_service.on_event = on_capture
     app.state.engine = create_database_engine(settings["DATABASE_URL"])
     app.state.session_factory = make_session_factory(app.state.engine)
     forecast_model.init_app(app)

@@ -75,6 +75,26 @@ def build_scheduler(settings, service: CaptureService):
     return scheduler
 
 
+def add_health_checks(scheduler, app) -> None:
+    """Check every camera between meals, so an offline camera is noticed before the next meal photos."""
+    from datetime import timedelta
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    settings = app.state.settings
+    zone = ZoneInfo(settings["TIMEZONE"])
+    monitor = app.state.camera_monitor
+
+    def check() -> None:
+        try:
+            monitor.check_all()
+        except Exception:
+            logger.exception("The camera check failed.")
+
+    scheduler.add_job(check, IntervalTrigger(minutes=settings["CAMERA_CHECK_MINUTES"], timezone=zone),
+                      id="camera-health", name="Camera check", replace_existing=True,
+                      next_run_time=datetime.now(zone) + timedelta(seconds=15))
+
+
 class SingleInstanceLock:
     """An operating-system file lock: held while this process runs, freed automatically if it dies."""
 
@@ -132,6 +152,7 @@ def start_scheduler(app):
         return None
     try:
         scheduler = build_scheduler(settings, service)
+        add_health_checks(scheduler, app)
         scheduler.start()
     except Exception:
         lock.release()

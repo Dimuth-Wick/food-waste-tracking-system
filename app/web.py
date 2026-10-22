@@ -67,6 +67,12 @@ templates.env.filters["amount"] = lambda value: f"{round(float(value or 0)):,}"
 
 def render(request: Request, template: str, status_code: int = 200, **context):
     context.setdefault("current_user", getattr(request.state, "user", None))
+    monitor = getattr(request.app.state, "camera_monitor", None)
+    if monitor is not None and "camera_alerts" not in context:
+        try:
+            context["camera_alerts"] = monitor.offline()
+        except Exception:   # a warning must never stop a page from showing
+            context["camera_alerts"] = []
     return templates.TemplateResponse(request, template, context, status_code=status_code)
 
 

@@ -17,6 +17,11 @@ CAPTURE_TEST_MODE  Set to 1 to ignore the meal times and capture every 15 second
 CAPTURE_TEST_SECONDS Seconds between captures in test mode (default 15).
 CAPTURE_DIR        Where photos are saved. Default instance/captures.
 
+Camera offline alerts (see README, "Camera offline alerts"):
+CAMERA_CHECK_MINUTES  How often each camera is checked between meals. Default 5.
+CAMERA_OFFLINE_AFTER  Failed checks in a row before a camera counts as offline. Default 3.
+CAMERA_ALERTS         Set to 0 to turn the alert emails off (the warning on screen stays). Default on.
+
 Waste value (see README, "Waste value"):
 CURRENCY_CODE      Currency of the prices. Default LKR (Sri Lankan rupees).
 CURRENCY_SYMBOL    Shown before amounts. Default "Rs".
@@ -173,6 +178,9 @@ def load_settings(overrides=None):
         "CAPTURE_DIR": os.environ.get("CAPTURE_DIR", str(DEFAULT_CAPTURE_DIR)),
         "CURRENCY_CODE": os.environ.get("CURRENCY_CODE", "LKR"),
         "CURRENCY_SYMBOL": os.environ.get("CURRENCY_SYMBOL", "Rs"),
+        "CAMERA_CHECK_MINUTES": os.environ.get("CAMERA_CHECK_MINUTES", 5),
+        "CAMERA_OFFLINE_AFTER": os.environ.get("CAMERA_OFFLINE_AFTER", 3),
+        "CAMERA_ALERTS": _default_on("CAMERA_ALERTS"),
         "ADMIN_EMAIL": os.environ.get("ADMIN_EMAIL", "").strip(),
         "SMTP_HOST": os.environ.get("SMTP_HOST", "").strip(),
         "SMTP_PORT": os.environ.get("SMTP_PORT", 587),
@@ -211,7 +219,7 @@ def load_settings(overrides=None):
         settings["PHOTO_GAP_SECONDS"] = float(settings["PHOTO_GAP_SECONDS"])
     except (TypeError, ValueError):
         raise ValueError("PHOTO_GAP_SECONDS must be a number.") from None
-    for key, low, high in (("SMTP_PORT", 1, 65535),):
+    for key, low, high in (("SMTP_PORT", 1, 65535), ("CAMERA_CHECK_MINUTES", 1, 60), ("CAMERA_OFFLINE_AFTER", 1, 10)):
         try:
             settings[key] = int(settings[key])
         except (TypeError, ValueError):

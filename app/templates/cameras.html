@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Camera status{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <h1>Camera status</h1>
+    <p class="page-description">Wastewise checks each buffet camera every {{ minutes }} minute{{ '' if minutes == 1 else 's' }} and after every meal photo. After {{ after }} failed check{{ '' if after == 1 else 's' }} in a row a camera counts as offline: a warning shows on every page{% if alerts %} and the managers on the Weekly report list get an email{% endif %}.</p>
+  </div>
+  {% if cameras %}
+  <form method="post" action="{{ url_for('check_cameras') }}"><button class="button button-primary" type="submit">Check now</button></form>
+  {% endif %}
+</section>
+
+{% if checked %}<div class="notice notice-success" role="status"><strong>Cameras checked.</strong>The status below is up to date.</div>{% endif %}
+
+{% if not cameras %}
+<section class="sheet"><p class="muted-note">No cameras are set up. Set <strong>CAMERA_SOURCES</strong> where the app runs, then restart it (see the README).</p></section>
+{% else %}
+<section class="sheet" aria-labelledby="camera-list-title">
+  <div class="sheet-heading"><h2 id="camera-list-title">Buffet cameras</h2>
+    <span class="sheet-note">{{ 'Checking automatically' if scheduled else 'Automatic checks are not running' }}</span></div>
+  <ul class="camera-list">
+    {% for camera in cameras %}
+    <li class="camera-item is-{{ camera.status }}">
+      <div class="camera-main">
+        <strong>{{ camera.name }}</strong>
+        <span class="camera-pill is-{{ camera.status }}">{{ {'online': 'Online', 'offline': 'Offline', 'unknown': 'Not checked yet'}[camera.status] }}</span>
+      </div>
+      <dl class="camera-facts">
+        {% if camera.status == 'offline' %}
+        <div><dt>Offline since</dt><dd>{{ camera.since }}</dd></div>
+        <div><dt>Problem</dt><dd>{{ camera.problem or 'The camera did not answer.' }}</dd></div>
+        {% endif %}
+        <div><dt>Last picture</dt><dd>{{ camera.last_ok or 'None yet' }}</dd></div>
+        <div><dt>Last check</dt><dd>{{ camera.checked or 'Not yet' }}</dd></div>
+      </dl>
+      {% if camera.note %}<p class="muted-note">{{ camera.note }}</p>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="muted-note">Alert emails go to the addresses on the <a class="text-link" href="{{ url_for('report_settings') }}">Weekly report</a> page. If a camera is offline, check that it is on, charged, on the hotel Wi-Fi and that its streaming app is running.</p>
+</section>
+{% endif %}
+{% endblock %}
