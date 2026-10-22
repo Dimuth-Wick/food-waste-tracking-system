@@ -92,3 +92,23 @@ def test_forecast_history_compares_actual_with_predicted(tmp_path):
         {"date": "2026-10-02", "meal_type": "Dinner", "actual": 31.0, "predicted": 30.0},
     ]}]}
     assert len(model.calls) == 1  # one model call for every point
+
+
+def test_predict_meal_only_accepts_trained_meals_dishes_and_sane_guest_counts(tmp_path):
+    model = FakeForecastModel()
+    browser = client(make_app(tmp_path, ML_MODEL=model))
+    unknown = browser.post("/api/predict-meal", json={
+        "meal_type": "Brunch", "food_item": "x", "guest_count": 100_000_000})
+    assert unknown.status_code == 400
+    fields = unknown.json()["fields"]
+    assert set(fields) == {"meal_type", "food_item", "guest_count"}
+    assert "must be one of" in fields["meal_type"]
+    assert "Fried rice" in fields["food_item"]
+    assert "at most 5,000" in fields["guest_count"]
+    assert model.calls == []                       # the model is never asked about them
+
+    # Letter case is forgiven, and the trained spelling is what the model receives.
+    ok = browser.post("/api/predict-meal", json={
+        "meal_type": "lunch", "food_item": "FRIED RICE", "guest_count": 5000})
+    assert ok.status_code == 200
+    assert model.calls == [[{"Meal type": "Lunch", "Food item": "Fried rice", "Guest count": 5000.0}]]

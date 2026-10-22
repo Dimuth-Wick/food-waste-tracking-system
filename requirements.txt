@@ -5,12 +5,13 @@ jinja2>=3.1,<4
 python-multipart>=0.0.20
 # Database (SQLite by default; for PostgreSQL also install psycopg[binary])
 sqlalchemy>=2.0,<3
+itsdangerous>=2.1,<3  # signs the sign-in cookie (Starlette sessions)
 werkzeug>=3,<4  # password hashing only, compatible with existing stored passwords
 # Forecast model
 joblib>=1.3
 pandas>=2.0
 scikit-learn==1.6.1
-Pillow>=10,<13
+Pillow>=13,<14
 # Automatic camera capture
 opencv-python-headless>=4.9,<5
 apscheduler>=3.10,<4

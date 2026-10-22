@@ -4,7 +4,7 @@
 bookmark it. Saving returns to the overview with the new record highlighted.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from math import isfinite
 import logging
 import re
@@ -25,6 +25,10 @@ from app.web import url_path
 
 logger = logging.getLogger(__name__)
 router = APIRouter(include_in_schema=False)
+# Largest single record accepted, and how far ahead of now a record may be dated.
+MAX_QUANTITY_KG = 500
+FUTURE_GRACE = timedelta(minutes=10)
+
 FIELD_NAMES = ("event_at", "area_id", "category_id", "reason_id", "quantity_kg")
 
 
@@ -73,6 +77,9 @@ def parse_form(values, lookups):
             if moment.tzinfo is not None:
                 raise ValueError("Expected local time")
             event_at = moment.replace(tzinfo=DEMO_TIMEZONE)
+            if event_at > datetime.now(DEMO_TIMEZONE) + FUTURE_GRACE:
+                errors["event_at"] = "The date and time cannot be in the future."
+                event_at = None
         except ValueError:
             errors["event_at"] = "Enter a valid local date and time."
 
@@ -97,6 +104,9 @@ def parse_form(values, lookups):
             quantity_kg = float(raw_quantity)
             if not isfinite(quantity_kg) or quantity_kg <= 0:
                 raise ValueError("Nonpositive or nonfinite quantity")
+            if quantity_kg > MAX_QUANTITY_KG:
+                errors["quantity_kg"] = f"A single record can be at most {MAX_QUANTITY_KG} kg. Split bigger amounts into several records."
+                quantity_kg = None
         except (ValueError, OverflowError):
             errors["quantity_kg"] = "Enter a number greater than zero in kilograms."
             quantity_kg = None

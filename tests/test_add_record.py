@@ -116,3 +116,26 @@ def test_missing_demo_entry_user_is_reported(tmp_path):
     assert response.status_code == 503
     assert "Initialize and seed the local database first" in response.text
     assert 'type="submit" disabled' in response.text
+
+
+def test_quantity_has_an_upper_limit(app_with_demo):
+    app = app_with_demo
+    browser = client(app)
+    for too_big in ("500.01", "99999", "1e300"):
+        form = valid_form(app)
+        form["quantity_kg"] = too_big
+        response = browser.post("/records/new", data=form)
+        assert response.status_code == 400
+        assert "at most 500 kg" in response.text
+    largest = valid_form(app)
+    largest["quantity_kg"] = "500"
+    assert browser.post("/records/new", data=largest).status_code == 303
+
+
+def test_a_record_cannot_be_dated_in_the_future(app_with_demo):
+    app = app_with_demo
+    form = valid_form(app)
+    form["event_at"] = "2099-01-01T10:00"
+    response = client(app).post("/records/new", data=form)
+    assert response.status_code == 400
+    assert "cannot be in the future" in response.text

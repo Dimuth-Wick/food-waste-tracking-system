@@ -33,6 +33,7 @@ FOOD_ITEMS = [
     "Salad", "Steamed rice", "String hoppers", "Vegetable curry",
 ]
 SAFETY_MARGIN = 0.10
+MAX_FORECAST_GUESTS = 5000  # the model is linear: far beyond what it saw it only guesses
 HISTORY_ITEMS = 5
 HISTORY_RECORDS_SCANNED = 2000
 
@@ -44,10 +45,14 @@ class MealRequest(BaseModel):
 
     @field_validator("meal_type", "food_item", mode="before")
     @classmethod
-    def _not_empty(cls, value, info):
+    def _known_value(cls, value, info):
         if value is None or not str(value).strip():
             raise ValueError(f"{info.field_name} must not be empty.")
-        return str(value).strip()
+        allowed = MEAL_TYPES if info.field_name == "meal_type" else FOOD_ITEMS
+        match = {name.casefold(): name for name in allowed}.get(str(value).strip().casefold())
+        if match is None:
+            raise ValueError(f"{info.field_name} must be one of: {', '.join(allowed)}.")
+        return match
 
     @field_validator("guest_count", mode="before")
     @classmethod
@@ -60,6 +65,8 @@ class MealRequest(BaseModel):
             raise ValueError("guest_count must be a number.") from None
         if not number > 0:
             raise ValueError("guest_count must be greater than 0.")
+        if number > MAX_FORECAST_GUESTS:
+            raise ValueError(f"guest_count must be at most {MAX_FORECAST_GUESTS:,}.")
         return number
 
 
