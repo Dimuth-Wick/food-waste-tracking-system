@@ -21,6 +21,17 @@ Waste value (see README, "Waste value"):
 CURRENCY_CODE      Currency of the prices. Default LKR (Sri Lankan rupees).
 CURRENCY_SYMBOL    Shown before amounts. Default "Rs".
 
+Weekly email report (see README, "Weekly email report"):
+ADMIN_EMAIL        The address reports are sent from (the system's admin email).
+SMTP_HOST          The mail server, for example smtp.gmail.com. Reports are off until this and ADMIN_EMAIL are set.
+SMTP_PORT          Default 587.
+SMTP_USER          Login name. Default: ADMIN_EMAIL.
+SMTP_PASSWORD      Login password (for Gmail, an app password). Keep it in the environment, never in code.
+SMTP_SECURITY      starttls (default), ssl or none.
+REPORT_DAY         Day the report is sent: mon..sun. Default sun.
+REPORT_TIME        Time it is sent, HH:MM in TIMEZONE. Default 18:00.
+PUBLIC_URL         Address of this app, for the link in the email. Default http://localhost:5000.
+
 Sign-in (see README, "Signing in"):
 REQUIRE_LOGIN      Managers and administrators must sign in. Default on; set to 0 to turn it off.
 SECRET_KEY         Signs the sign-in cookie. Default: a random key created once in instance/secret_key.
@@ -51,6 +62,8 @@ DEFAULT_MEAL_SCHEDULE = {
 DEFAULT_PHOTOS_PER_CAPTURE = 4
 DEFAULT_PHOTO_GAP_SECONDS = 2.0
 DEFAULT_TEST_SECONDS = 15
+
+REPORT_DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
 _TIME = re.compile(r"([01]\d|2[0-3]):([0-5]\d)")
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}")
@@ -143,7 +156,8 @@ def load_settings(overrides=None):
         FOOD_CLASSIFIER_MODEL, FOOD_CLASSIFIER_MODEL_PATH,
         FOOD_COUNTER, FOOD_COUNTER_MODEL_NAME,
         TIMEZONE, MEAL_SCHEDULE, CAMERA_SOURCES, PHOTOS_PER_CAPTURE, PHOTO_GAP_SECONDS,
-        CAPTURE_TEST_MODE, CAPTURE_TEST_SECONDS, CAPTURE_DIR, FRAME_GRABBER (tests), CAPTURE_SCHEDULER_SKIP
+        CAPTURE_TEST_MODE, CAPTURE_TEST_SECONDS, CAPTURE_DIR, FRAME_GRABBER (tests), CAPTURE_SCHEDULER_SKIP,
+        ADMIN_EMAIL, SMTP_*, REPORT_DAY, REPORT_TIME, PUBLIC_URL, REPORT_SCHEDULER_SKIP
     """
     settings = {
         "DATABASE_URL": os.environ.get("DATABASE_URL", f"sqlite:///{DEFAULT_DATABASE.as_posix()}"),
@@ -159,6 +173,15 @@ def load_settings(overrides=None):
         "CAPTURE_DIR": os.environ.get("CAPTURE_DIR", str(DEFAULT_CAPTURE_DIR)),
         "CURRENCY_CODE": os.environ.get("CURRENCY_CODE", "LKR"),
         "CURRENCY_SYMBOL": os.environ.get("CURRENCY_SYMBOL", "Rs"),
+        "ADMIN_EMAIL": os.environ.get("ADMIN_EMAIL", "").strip(),
+        "SMTP_HOST": os.environ.get("SMTP_HOST", "").strip(),
+        "SMTP_PORT": os.environ.get("SMTP_PORT", 587),
+        "SMTP_USER": os.environ.get("SMTP_USER", "").strip(),
+        "SMTP_PASSWORD": os.environ.get("SMTP_PASSWORD", ""),
+        "SMTP_SECURITY": os.environ.get("SMTP_SECURITY", "starttls").strip().lower(),
+        "REPORT_DAY": os.environ.get("REPORT_DAY", "sun").strip().lower(),
+        "REPORT_TIME": os.environ.get("REPORT_TIME", "18:00").strip(),
+        "PUBLIC_URL": os.environ.get("PUBLIC_URL", "http://localhost:5000").strip().rstrip("/"),
         "REQUIRE_LOGIN": _default_on("REQUIRE_LOGIN"),
         "SESSION_HOURS": os.environ.get("SESSION_HOURS", 8),
         "REMEMBER_DAYS": os.environ.get("REMEMBER_DAYS", 30),
@@ -188,5 +211,20 @@ def load_settings(overrides=None):
         settings["PHOTO_GAP_SECONDS"] = float(settings["PHOTO_GAP_SECONDS"])
     except (TypeError, ValueError):
         raise ValueError("PHOTO_GAP_SECONDS must be a number.") from None
+    for key, low, high in (("SMTP_PORT", 1, 65535),):
+        try:
+            settings[key] = int(settings[key])
+        except (TypeError, ValueError):
+            raise ValueError(f"{key} must be a whole number.") from None
+        if not low <= settings[key] <= high:
+            raise ValueError(f"{key} must be between {low} and {high}.")
+    if settings["SMTP_SECURITY"] not in {"starttls", "ssl", "none"}:
+        raise ValueError("SMTP_SECURITY must be starttls, ssl or none.")
+    if settings["REPORT_DAY"][:3] not in REPORT_DAYS:
+        raise ValueError("REPORT_DAY must be a day of the week, such as sun.")
+    settings["REPORT_DAY"] = settings["REPORT_DAY"][:3]
+    if not _TIME.fullmatch(settings["REPORT_TIME"]):
+        raise ValueError("REPORT_TIME must be HH:MM, such as 18:00.")
+    settings["SMTP_USER"] = settings["SMTP_USER"] or settings["ADMIN_EMAIL"]
     settings["CAPTURE_DIR"] = Path(settings["CAPTURE_DIR"])
     return settings

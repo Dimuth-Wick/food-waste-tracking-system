@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Weekly report{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <h1>Weekly report</h1>
+    <p class="page-description">Every {{ day }} at {{ time }} ({{ zone_name }}) Wastewise emails managers the week's waste cost, a day-by-day chart, shortages and advice for next week.</p>
+  </div>
+</section>
+
+{% if notice %}<div class="notice notice-success" role="status"><strong>{{ notice }}</strong></div>{% endif %}
+{% if error and not field_error %}<div class="notice notice-error" role="alert"><strong>{{ error }}</strong></div>{% endif %}
+
+{% if not ready %}
+<div class="notice notice-error" role="status"><strong>Email is not set up yet.</strong>Set {{ missing|join(' and ') }} (and SMTP_PASSWORD) where the app runs, then restart it. The README explains how, including Gmail app passwords.</div>
+{% endif %}
+
+<section class="sheet report-sheet" aria-labelledby="recipients-title">
+  <div class="sheet-heading">
+    <h2 id="recipients-title">Who gets the report</h2>
+    <span class="sheet-note">Sent from {{ sender or 'the admin email (not set)' }}</span>
+  </div>
+  {% if recipients %}
+  <ul class="recipient-list">
+    {% for person in recipients %}
+    <li>
+      <span>{{ person.email }}</span>
+      <form method="post" action="{{ url_for('remove_report_recipient', recipient_id=person.id) }}">
+        <button class="button button-secondary" type="submit" aria-label="Remove {{ person.email }}">Remove</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted-note">Nobody yet. Add a manager's email address to start.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('add_report_recipient') }}" class="recipient-add" novalidate>
+    <label for="report-email">Add an email address</label>
+    <div class="recipient-row">
+      <input id="report-email" name="email" type="email" autocomplete="off" maxlength="254" placeholder="manager@hotel.com" value="{{ entered }}"
+             {% if field_error %}aria-invalid="true" aria-describedby="report-email-error"{% endif %}>
+      <button class="button button-primary" type="submit">Add</button>
+    </div>
+    {% if field_error %}<small class="field-error" id="report-email-error">{{ error }}</small>{% endif %}
+    <p class="muted-note">Up to {{ max_recipients }} addresses. Each person gets their own copy.</p>
+  </form>
+</section>
+
+<section class="sheet report-sheet" aria-labelledby="send-title">
+  <div class="sheet-heading">
+    <h2 id="send-title">Sending</h2>
+    <span class="sheet-note">{{ 'On' if enabled else 'Off' }}</span>
+  </div>
+  <div class="report-actions">
+    <form method="post" action="{{ url_for('switch_report') }}">
+      <input type="hidden" name="on" value="{{ '0' if enabled else '1' }}">
+      <button class="button button-secondary" type="submit">{{ 'Turn the weekly report off' if enabled else 'Turn the weekly report on' }}</button>
+    </form>
+    <form method="post" action="{{ url_for('send_test_report') }}"><button class="button button-secondary" type="submit"{% if not ready or not recipients %} disabled{% endif %}>Send a test email</button></form>
+    <form method="post" action="{{ url_for('send_report_now') }}"><button class="button button-primary" type="submit"{% if not ready or not recipients %} disabled{% endif %}>Send this week's report now</button></form>
+    <a class="button button-secondary" href="{{ url_for('report_preview') }}" target="_blank" rel="noopener">Preview the report</a>
+  </div>
+  <p class="muted-note">
+    {% if last %}Last attempt: {{ 'a test email' if last.kind == 'test' else ('sent by hand' if last.kind == 'manual' else 'the weekly report') }} —
+      {% if last.status == 'sent' %}<strong>sent to {{ last.sent_to }}</strong>{% else %}<strong class="report-failed">failed</strong>: {{ last.error }}{% endif %}
+      ({{ last.created_at[:16]|replace('T', ' ') }} UTC).
+    {% else %}Nothing has been sent yet.{% endif %}
+    If the app is off at the time, the report is sent when it next starts.
+  </p>
+</section>
+{% endblock %}

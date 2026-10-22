@@ -225,3 +225,36 @@ class FoodPriceRow(Base):
     price_per_piece: Mapped[float | None] = mapped_column(Float, nullable=True)   # set when the food is priced per piece
     piece_kg: Mapped[float | None] = mapped_column(Float, nullable=True)          # what one piece weighs
     updated_at: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class ReportRecipientRow(Base):
+    """A manager's email address that gets the weekly report."""
+
+    __tablename__ = "report_recipients"
+
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
+    email: Mapped[str] = mapped_column(String(254), nullable=False, unique=True)   # stored in lower case
+    added_at: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class ReportSettingRow(Base):
+    """A small named setting of the weekly report (whether it is on, and since when)."""
+
+    __tablename__ = "report_settings"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    value: Mapped[str] = mapped_column(String(80), nullable=False)
+
+
+class ReportLogRow(Base):
+    """One attempt to send a report: scheduled, sent by hand, or a test."""
+
+    __tablename__ = "report_log"
+
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)          # weekly, manual or test
+    period_end: Mapped[str] = mapped_column(String(32), nullable=False)    # UTC time the reported week ends
+    status: Mapped[str] = mapped_column(String(10), nullable=False)        # sent or failed
+    sent_to: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    error: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    created_at: Mapped[str] = mapped_column(String(32), nullable=False)

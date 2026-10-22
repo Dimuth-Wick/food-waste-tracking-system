@@ -21,6 +21,8 @@ from app.config import load_settings
 from app.database.connection import create_database_engine, make_session_factory
 from app.forecast import model as forecast_model
 from app.forecast import views as forecast
+from app.reports import views as reports
+from app.reports.schedule import start_report_scheduler, stop_report_scheduler
 from app.vision import counting, meal_check
 from app.waste_records import add_record, edit_record, food_prices, overview
 from app.web import RequestSizeLimit, install_error_handlers, templates
@@ -30,6 +32,7 @@ ROUTERS = (
     auth.router,                                                                  # sign in and out
     overview.router, add_record.router, edit_record.router, food_prices.router,   # waste records and prices
     forecast.router,                                                              # meal forecast
+    reports.router,                                                               # weekly email report
     counting.router, meal_check.router,                                           # food counting
     camera.router,                                                                # camera captures
 )
@@ -41,10 +44,12 @@ async def lifespan(app: FastAPI):
     if not app.state.settings.get("TESTING"):
         app.state.counting_worker.start()
     start_scheduler(app)
+    start_report_scheduler(app)
     try:
         yield
     finally:
         stop_scheduler(app)
+        stop_report_scheduler(app)
         app.state.counting_worker.stop()
 
 

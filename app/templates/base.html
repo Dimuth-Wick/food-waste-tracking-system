@@ -21,6 +21,7 @@
           <ul aria-labelledby="nav-tracking">
             <li><a href="{{ url_for('dashboard') }}" {% if active_page == 'dashboard' %}aria-current="page"{% endif %}>Waste overview</a></li>
             <li><a href="{{ url_for('food_prices') }}" {% if active_page == 'food_prices' %}aria-current="page"{% endif %}>Food prices</a></li>
+            <li><a href="{{ url_for('report_settings') }}" {% if active_page == 'reports' %}aria-current="page"{% endif %}>Weekly report</a></li>
           </ul>
           <p class="nav-group-label" id="nav-models">Prediction tools</p>
           <ul aria-labelledby="nav-models">

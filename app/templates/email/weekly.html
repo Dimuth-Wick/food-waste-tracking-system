@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Wastewise weekly report</title></head>
+<body style="margin:0;padding:0;background:#eef3ef;font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#17332a;">
+{% set cur = report.currency %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef3ef;"><tr><td align="center" style="padding:20px 10px;">
+<table role="presentation" width="620" cellpadding="0" cellspacing="0" style="width:100%;max-width:620px;background:#ffffff;border-radius:14px;overflow:hidden;">
+
+  <tr><td style="background:#064e3b;padding:26px 28px;">
+    <div style="font-size:13px;color:#9fe0c3;font-weight:600;">Wastewise weekly report</div>
+    <div style="font-size:26px;line-height:1.25;color:#ffffff;font-weight:700;margin-top:6px;">{{ report.start.strftime('%d %b') }} to {{ report.end.strftime('%d %b %Y') }}</div>
+  </td></tr>
+
+  <tr><td style="padding:24px 28px 8px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td width="50%" valign="top" style="padding-right:8px;">
+        <div style="background:#f1f8f4;border-radius:12px;padding:16px;">
+          <div style="font-size:13px;color:#4b6b5e;">Food waste this week</div>
+          <div style="font-size:28px;font-weight:700;color:#064e3b;margin-top:4px;">≈ {{ cur }} {{ report.value|amount }}</div>
+          <div style="font-size:14px;color:#4b6b5e;margin-top:2px;">{{ '%.1f'|format(report.kg) }} kg thrown away</div>
+        </div>
+      </td>
+      <td width="50%" valign="top" style="padding-left:8px;">
+        {% set change = report.value_change %}
+        {% set good = change is not none and change <= 0 %}
+        <div style="background:{{ '#e3f6ec' if change is none or good else '#fff0e4' }};border-radius:12px;padding:16px;">
+          <div style="font-size:13px;color:#4b6b5e;">Compared with last week</div>
+          {% if change is none %}
+          <div style="font-size:20px;font-weight:700;color:#4b6b5e;margin-top:8px;">Nothing to compare</div>
+          <div style="font-size:14px;color:#4b6b5e;margin-top:2px;">No waste was recorded last week</div>
+          {% else %}
+          <div style="font-size:28px;font-weight:700;color:{{ '#0a8a54' if good else '#c2540a' }};margin-top:4px;">{{ '▼' if change < 0 else ('▲' if change > 0 else '■') }} {{ (change|abs * 100)|round|int }}%</div>
+          <div style="font-size:14px;color:#4b6b5e;margin-top:2px;">Last week ≈ {{ cur }} {{ report.value_before|amount }} ({{ '%.1f'|format(report.kg_before) }} kg)</div>
+          {% endif %}
+        </div>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <tr><td style="padding:20px 28px 4px;">
+    <div style="font-size:18px;font-weight:700;color:#064e3b;">Day by day</div>
+    <div style="font-size:13px;color:#4b6b5e;margin:2px 0 10px;">Cost of the food thrown away{% if report.peak_day %}. The costliest day was {{ report.peak_day.date.strftime('%A') }}{% endif %}.</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      {% for day in report.daily %}
+      {% set width = [(day.share * 100)|round|int, 2 if day.value > 0 else 0]|max %}
+      <tr>
+        <td width="74" style="font-size:13px;color:#4b6b5e;padding:5px 0;">{{ day.date.strftime('%a %d %b') }}</td>
+        <td style="padding:5px 8px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td style="background:#e6efe9;border-radius:5px;height:14px;line-height:14px;font-size:0;">
+              {% if width %}<table role="presentation" width="{{ width }}%" cellpadding="0" cellspacing="0"><tr><td style="background:{{ '#ff7a1a' if report.peak_day and day.date == report.peak_day.date else '#18755a' }};border-radius:5px;height:14px;line-height:14px;font-size:0;">&nbsp;</td></tr></table>{% else %}&nbsp;{% endif %}
+            </td>
+          </tr></table>
+        </td>
+        <td width="92" align="right" style="font-size:13px;color:#17332a;padding:5px 0;white-space:nowrap;">{{ cur }} {{ day.value|amount }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:18px 28px 4px;">
+    <div style="font-size:18px;font-weight:700;color:#064e3b;">Shortages</div>
+    {% if report.shortages %}
+    <div style="font-size:14px;color:#17332a;margin:6px 0 8px;">Food ran out on <strong>{{ report.shortages|length }} day{{ '' if report.shortages|length == 1 else 's' }}</strong>; the missing food was worth about {{ cur }} {{ report.short_value|amount }}.</div>
+    {% for day in report.shortages %}
+    <div style="background:#fff0e4;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:13px;color:#7a3a07;">{{ day.date.strftime('%A %d %b') }}: food ran out {{ day.short_count }} time{{ '' if day.short_count == 1 else 's' }} ({{ '%.1f'|format(day.short_kg) }} kg short)</div>
+    {% endfor %}
+    {% else %}
+    <div style="font-size:14px;color:#0a6b43;margin:6px 0 0;">✓ No food ran out this week.</div>
+    {% endif %}
+  </td></tr>
+
+  {% if report.foods %}
+  <tr><td style="padding:20px 28px 4px;">
+    <div style="font-size:18px;font-weight:700;color:#064e3b;">What cost the most</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+      {% for food in report.foods %}
+      <tr>
+        <td width="130" style="font-size:13px;color:#17332a;padding:5px 0;">{{ food.name }}</td>
+        <td style="padding:5px 8px;">
+          <table role="presentation" width="{{ [(food.share * 100)|round|int, 3]|max }}%" cellpadding="0" cellspacing="0"><tr><td style="background:#0a8a54;border-radius:5px;height:14px;line-height:14px;font-size:0;">&nbsp;</td></tr></table>
+        </td>
+        <td width="100" align="right" style="font-size:13px;color:#17332a;padding:5px 0;white-space:nowrap;">{{ cur }} {{ food.value|amount }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </td></tr>
+  {% endif %}
+
+  {% if report.advice %}
+  <tr><td style="padding:20px 28px 4px;">
+    <div style="font-size:18px;font-weight:700;color:#064e3b;">Where to cut next week</div>
+    {% for item in report.advice %}
+    <div style="border-left:4px solid #ff7a1a;background:#fbf7f2;border-radius:0 8px 8px 0;padding:10px 14px;margin-top:8px;">
+      <div style="font-size:14px;font-weight:700;color:#17332a;">{{ item.food }}: {{ '%.1f'|format(item.kg) }} kg wasted, ≈ {{ cur }} {{ item.value|amount }}</div>
+      <div style="font-size:13px;color:#4b6b5e;margin-top:2px;">{{ item.text }}</div>
+    </div>
+    {% endfor %}
+  </td></tr>
+  {% endif %}
+
+  <tr><td style="padding:20px 28px 4px;">
+    <div style="font-size:18px;font-weight:700;color:#064e3b;">Forecast for next week</div>
+    {% if report.forecast.rows %}
+    <div style="font-size:13px;color:#4b6b5e;margin:2px 0 8px;">How much to prepare, at last week's average number of guests, including a 10% safety margin.</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      {% for row in report.forecast.rows %}
+      <tr>
+        <td width="170" style="font-size:13px;color:#17332a;padding:5px 0;">{{ row.meal }} · {{ row.food }}<br><span style="color:#4b6b5e;font-size:12px;">for {{ row.guests }} guests</span></td>
+        <td style="padding:5px 8px;">
+          <table role="presentation" width="{{ [(row.share * 100)|round|int, 3]|max }}%" cellpadding="0" cellspacing="0"><tr><td style="background:#18755a;border-radius:5px;height:14px;line-height:14px;font-size:0;">&nbsp;</td></tr></table>
+        </td>
+        <td width="70" align="right" style="font-size:13px;font-weight:700;color:#17332a;padding:5px 0;white-space:nowrap;">{{ row.kg }} kg</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <div style="font-size:14px;color:#4b6b5e;margin:6px 0 0;">There is no forecast this week. Quantities need the guest numbers from confirmed meal checks and one of the dishes the forecast knows among the most wasted foods.</div>
+    {% endif %}
+  </td></tr>
+
+  <tr><td style="padding:26px 28px 28px;" align="left">
+    <a href="{{ report.link }}" style="display:inline-block;background:#ff7a1a;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 22px;border-radius:10px;">Open Wastewise</a>
+    <div style="font-size:12px;color:#7a8f86;margin-top:16px;">Values are approximate: they use the prices on the Food prices page. This report is sent every week by Wastewise. Managers can change who receives it on the Weekly report page.</div>
+  </td></tr>
+</table>
+</td></tr></table>
+</body>
+</html>

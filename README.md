@@ -96,7 +96,8 @@ Confirming a meal check, for each food that was put out:
 | Add record | `/records/new` | Opens the overview with the add panel showing |
 | Edit record | `/records/<id>/edit` | Opens the overview with the edit panel showing |
 | Day page | `/days/<date>` | One day's records by meal, with food and value |
-| Food prices | `/food-prices` | The approximate price per kg of each food (sign-in needed) |
+| Food prices | `/food-prices` | The approximate price per kg or per piece of each food (sign-in needed) |
+| Weekly report | `/reports` | Who gets the weekly email, a preview, and test and send-now buttons (sign-in needed) |
 | Meal forecast | `/forecast` | Forecast and past accuracy (React) |
 | Sign in | `/login` | Manager sign-in (public); `POST /logout` signs out |
 | Food counting | `/food-counting` | Camera photos by day and meal, counts, meal checks to confirm, the food list (React) |
@@ -123,7 +124,7 @@ Confirming a meal check, for each food that was put out:
 | Forecast model | scikit-learn pipeline (one-hot encoding and linear regression), saved with joblib |
 | Food counting model | [`google/owlv2-base-patch16-ensemble`](https://huggingface.co/google/owlv2-base-patch16-ensemble) with PyTorch and Hugging Face Transformers |
 | Camera capture | OpenCV (reads the camera stream), APScheduler (meal times) |
-| Tests | pytest (145 tests) |
+| Tests | pytest (159 tests) |
 | Version control | Git, GitHub (`main` for stable work, `dev` for practice) |
 
 ## 🤖 Machine learning
@@ -236,6 +237,37 @@ Hotels care about what waste **costs**, not what it weighs. Every waste record s
 
 Older records are sorted into foods automatically the first time the app starts: demo records and photo counts use the food named in their notes, and anything unknown stays **Mixed food**. The prices live in the `food_prices` table (created automatically); the foods are the existing `categories` table.
 
+## 📧 Weekly email report
+
+Every **Sunday at 18:00** (Sri Lanka time) Wastewise emails managers a short report with charts, built from the same numbers as the Waste overview:
+
+- the week's **waste cost and weight**, compared with the previous week (▼ down is good, ▲ up is not);
+- a **day-by-day bar chart** of cost, and the days the **food ran out** (shortages);
+- **what cost the most**, and **where to cut**: for the three costliest foods, how much less to prepare each day;
+- a **forecast for next week**: for the wasteful dishes the forecast model knows, how much to prepare at last week's average guest numbers per meal (from confirmed meal checks), including the 10% safety margin.
+
+**Set it up (once)**
+1. Choose the address the report is sent **from**: the system's admin email. For Gmail, turn on 2-step verification and create an **app password** (Google account, Security, App passwords).
+2. Set these where the app runs, then restart it. They stay in the environment, never in code:
+
+| Setting | Example | Notes |
+|---|---|---|
+| `ADMIN_EMAIL` | `wastewise.admin@gmail.com` | The sender, and the default login name |
+| `SMTP_HOST` | `smtp.gmail.com` | Reports stay off until `ADMIN_EMAIL` and `SMTP_HOST` are set |
+| `SMTP_PORT` | `587` | Default 587 |
+| `SMTP_SECURITY` | `starttls` | `starttls` (default), `ssl` (port 465) or `none` |
+| `SMTP_USER` / `SMTP_PASSWORD` | | Login; for Gmail the app password |
+| `REPORT_DAY` / `REPORT_TIME` | `sun` / `18:00` | When it is sent, in `TIMEZONE` |
+| `PUBLIC_URL` | `http://192.168.8.10:5000` | Where the email's "Open Wastewise" button goes |
+
+3. Sign in and open **Weekly report** in the sidebar. **Add the managers' email addresses**, press **Send a test email**, and use **Preview the report** to see it in the browser. **Send this week's report now** sends it straight away.
+
+**Good to know**
+- Each person gets their own copy, so addresses are not shown to each other. A manager can turn the weekly report off and on, and remove addresses, on the same page.
+- The app must be running at the send time. If it was off, the missed report is sent **once** when the app next starts (a report that was due before the weekly report was last turned on is never sent late).
+- A failed send (wrong password, no network) is shown on the page and in the log, without the password.
+- Reports use today's prices, so they are approximate, like every value in Wastewise.
+
 ## 🔐 Signing in
 
 The app is for hotel **managers and administrators**. Everything except the sign-in page needs a sign-in. Visitors are sent to the **Manager sign in** page (`/login`) and come back to the page they asked for afterwards. The page has an animated picture of what Wastewise does (it stands still for people who ask their system for reduced motion) and a form with a show/hide password button, a Caps Lock warning, and clear messages.
@@ -274,7 +306,8 @@ SQLAlchemy lets the app run on the local SQLite file by default, and on PostgreS
 | `meal_check_drafts` | Meals whose start and end photos are counted, waiting for staff to confirm |
 | `areas`, `reasons` | The lists used in the forms and filters |
 | `categories` | The foods: menu dishes, camera foods, food groups and **Mixed food**. Each record is of one food |
-| `food_prices` | The approximate price per kilogram of each food |
+| `food_prices` | The approximate price per kilogram (or per piece) of each food |
+| `report_recipients`, `report_settings`, `report_log` | Who gets the weekly report, whether it is on, and each send |
 | `users` | Demo users with hashed passwords |
 
 `meal_checks` and the camera tables are created automatically the first time they are needed, so older databases keep working. Existing SQLite files from the earlier Flask version work without changes.
@@ -321,6 +354,7 @@ food-waste-tracking-system/
 │   ├── database/           Tables (SQLAlchemy), connection, queries, food prices (prices.py) and demo seed data
 │   ├── waste_records/      Waste overview, day pages, the Add and Edit record panels, and Food prices
 │   ├── forecast/           Meal forecast page, its JSON APIs and the forecast model loader
+│   ├── reports/            Weekly email report: builder, SMTP mailer, schedule and the Weekly report page
 │   ├── vision/             Food counting page, photo counting and meal-check saving, upload checks
 │   ├── camera/             Camera capture: taking photos, schedule, background counting, pairing, APIs
 │   ├── templates/          HTML for the server-rendered pages and the shared layout
@@ -363,6 +397,7 @@ Where to start:
 - [x] Capture photos automatically from buffet cameras at set times.
 - [ ] Fine-tune the counting model with the saved camera photos.
 - [x] Waste shown as approximate money, with a price per kg for each food.
+- [x] A weekly email report to managers, with charts, shortages and advice.
 - [ ] Show the cost of the recommended quantity on the meal forecast, and keep a history of price changes.
 - [ ] Estimate food weight directly from photos.
 - [x] Manager sign-in with sessions, password protection and an animated sign-in page.
